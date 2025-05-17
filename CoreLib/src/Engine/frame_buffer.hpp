@@ -5,7 +5,7 @@
 #include "graphics/color.hpp"
 #include "math/point.hpp"
 
-#define MAX_DEPTH 10000
+#define MAX_DEPTH 100000.0f
 
 namespace rnd
 {
@@ -17,7 +17,7 @@ namespace rnd
 			width{ width },
 			height{ height },
 			color_buffer{ std::make_unique<color[]>(width * height) },
-			depth_buffer{ std::make_unique<u32[]>(width * height)}
+			depth_buffer{ std::make_unique<f32[]>(width * height)}
 		{}
 
 		void put_pixel(u32 x, u32 y, const color& c)
@@ -53,7 +53,7 @@ namespace rnd
 			this->height = height;
 
 			color_buffer = std::make_unique<color[]>(width * height);
-			depth_buffer = std::make_unique<u32[]>(width * height);
+			depth_buffer = std::make_unique<f32[]>(width * height);
 		}
 
 		inline u32 get_width()	const { return width; }
@@ -63,7 +63,17 @@ namespace rnd
 
 		inline const color* get_color_buffer()	const { return color_buffer.get(); }
 
-		inline const rnd::u32 get_depth(rnd::u32 x, rnd::u32 y) const
+		//inline const rnd::u32 get_depth(rnd::u32 x, rnd::u32 y) const
+		//{
+		//	ASSERT(x < width, "x < {}. x = {}", width, x);
+		//	ASSERT(y < height, "y < {}. y = {}", height, y);
+		//	ASSERT(x >= 0, "x >= 0. x = {}", x);
+		//	ASSERT(y >= 0, "y >= 0. y = {}", y);
+
+		//	return depth_buffer[y * width + x];
+		//}
+
+		inline const rnd::f32 get_depth(rnd::u32 x, rnd::u32 y) const
 		{
 			ASSERT(x < width, "x < {}. x = {}", width, x);
 			ASSERT(y < height, "y < {}. y = {}", height, y);
@@ -73,7 +83,7 @@ namespace rnd
 			return depth_buffer[y * width + x];
 		}
 
-		inline void set_depth(rnd::u32 x, rnd::u32 y, rnd::u32 depth)
+		inline void set_depth(rnd::u32 x, rnd::u32 y, rnd::f32 depth)
 		{
 			ASSERT(x < width, "x < {}. x = {}", width, x);
 			ASSERT(y < height, "y < {}. y = {}", height, y);
@@ -85,15 +95,19 @@ namespace rnd
 
 		void clear_depth()
 		{
-			std::fill(depth_buffer.get(), depth_buffer.get() + (width * height), MAX_DEPTH);
+			auto ptr = depth_buffer.get();
+			auto size = width * height;
+			std::fill(ptr, ptr + size, MAX_DEPTH);
+			// std::fill(depth_buffer.get(), depth_buffer.get() + (width * height), MAX_DEPTH);
 		}
 
-		inline const u32* get_depth_buffer() const { return depth_buffer.get(); }
+		inline const f32* get_depth_buffer() const { return depth_buffer.get(); }
 
 	private:
 		u32 width, height;
 		std::unique_ptr<color[]> color_buffer;
-		std::unique_ptr<u32[]> depth_buffer;
+		//std::unique_ptr<u32[]> depth_buffer;
+		std::unique_ptr<f32[]> depth_buffer;
 	};
 
 }

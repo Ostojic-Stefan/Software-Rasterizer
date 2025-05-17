@@ -112,21 +112,19 @@ namespace math
             };
         }
 
-        // Perspective projection matrix (OpenGL style, column-major).
         static mat4 perspective(float near, float far, float fovy, float aspect_ratio) {
             mat4 result{};
             float tanHalfFovy = std::tan(fovy / 2.0f);
-            float f = 1.0f / tanHalfFovy;
-
+            
             // Column 0
-            result.values[0] = f / aspect_ratio;
+            result.values[0] = 1.0f / (aspect_ratio * tanHalfFovy);
             result.values[1] = 0.f;
             result.values[2] = 0.f;
             result.values[3] = 0.f;
 
             // Column 1
             result.values[4] = 0.f;
-            result.values[5] = f;
+            result.values[5] = 1.0f / tanHalfFovy;
             result.values[6] = 0.f;
             result.values[7] = 0.f;
 
@@ -175,6 +173,36 @@ namespace math
             result.values[12] = -dot(s, eye);
             result.values[13] = -dot(u, eye);
             result.values[14] = dot(f, eye);
+            result.values[15] = 1.f;
+
+            return result;
+        }
+
+        static mat4 orthographic(float left, float right, float bottom, float top, float near, float far) {
+            mat4 result{};
+
+            // Column 0
+            result.values[0] = 2.f / (right - left);
+            result.values[1] = 0.f;
+            result.values[2] = 0.f;
+            result.values[3] = 0.f;
+
+            // Column 1
+            result.values[4] = 0.f;
+            result.values[5] = 2.f / (top - bottom);
+            result.values[6] = 0.f;
+            result.values[7] = 0.f;
+
+            // Column 2
+            result.values[8] = 0.f;
+            result.values[9] = 0.f;
+            result.values[10] = -2.f / (far - near);
+            result.values[11] = 0.f;
+
+            // Column 3
+            result.values[12] = -(right + left) / (right - left);
+            result.values[13] = -(top + bottom) / (top - bottom);
+            result.values[14] = -(far + near) / (far - near);
             result.values[15] = 1.f;
 
             return result;

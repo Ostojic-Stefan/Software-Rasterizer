@@ -3,6 +3,7 @@
 #include "pch.h"
 #include "math/vector.hpp"
 #include "math/util.hpp"
+#include <iostream>
 
 namespace gfx
 {
@@ -15,6 +16,69 @@ namespace gfx
 		std::vector<math::vec4> colors;
 		std::vector<rnd::u32>	indices;
 	};
+
+	static inline mesh get_tessellated_plane_mesh(unsigned int tessellationX, unsigned int tessellationY)
+	{
+		std::vector<math::vec3> positions;
+		std::vector<math::vec2> tex_coords;
+		std::vector<math::vec3> normals;
+		std::vector<math::vec4> colors;
+		std::vector<rnd::u32> indices;
+
+		// The plane extends from -0.5 to 0.5 in both X and Y.
+		// Compute the size of each cell along x and y.
+		float stepX = 1.0f / tessellationX;
+		float stepY = 1.0f / tessellationY;
+
+		// Generate vertices:
+		// There will be (tessellationX + 1) vertices in the x-direction
+		// and (tessellationY + 1) vertices in the y-direction.
+		for (unsigned int j = 0; j <= tessellationY; ++j) {
+			for (unsigned int i = 0; i <= tessellationX; ++i) {
+				// Position: interpolate from -0.5 to 0.5
+				float x = -0.5f + i * stepX;
+				float y = -0.5f + j * stepY;
+				positions.push_back({ x, y, 0.0f });
+
+				// Texture coordinates from 0 to 1 across the plane.
+				tex_coords.push_back({ static_cast<float>(i) / tessellationX,
+										 static_cast<float>(j) / tessellationY });
+
+				// Normal facing forward (for a flat plane in the XY plane, Z is up)
+				normals.push_back({ 0.0f, 0.0f, 1.0f });
+
+				// For colors, we can create a gradient or simply use a constant color.
+				// Here, we blend using the texture coordinates.
+				colors.push_back({ static_cast<float>(i) / tessellationX,
+								   static_cast<float>(j) / tessellationY,
+								   0.0f, 1.0f });
+			}
+		}
+
+		// Generate indices for triangles.
+		// Each quad (cell) will be divided into two triangles.
+		for (unsigned int j = 0; j < tessellationY; ++j) {
+			for (unsigned int i = 0; i < tessellationX; ++i) {
+				// Calculate the indices of the quad's corners.
+				unsigned int topLeft = j * (tessellationX + 1) + i;
+				unsigned int topRight = topLeft + 1;
+				unsigned int bottomLeft = (j + 1) * (tessellationX + 1) + i;
+				unsigned int bottomRight = bottomLeft + 1;
+
+				// First triangle (top-left, bottom-left, top-right)
+				indices.push_back(topLeft);
+				indices.push_back(bottomLeft);
+				indices.push_back(topRight);
+
+				// Second triangle (top-right, bottom-left, bottomRight)
+				indices.push_back(topRight);
+				indices.push_back(bottomLeft);
+				indices.push_back(bottomRight);
+			}
+		}
+
+		return { positions, tex_coords, normals, colors, indices };
+	}
 
 	static inline mesh get_triangle_mesh()
 	{
@@ -86,6 +150,7 @@ namespace gfx
 
 		return { positions, tex_coords, normals, colors, indices };
 	}
+
 
 	static inline mesh get_cube_mesh(rnd::f32 size = 0.25f)
 	{
@@ -365,22 +430,20 @@ namespace gfx
 
 	static inline mesh load_mesh_from_obj(std::string_view file_path)
 	{
-		static std::vector<Vertex> vertices;
-		static std::vector<unsigned int> indices;
+		std::vector<Vertex> vertices;
+		std::vector<unsigned int> indices;
 
 		std::ifstream file(file_path.data());
-		//if (!file.is_open()) {
-		//    std::cerr << "Failed to open OBJ file: " << filename << std::endl;
-		//    return;
-		//}
+		ASSERT(file.is_open(), "Failed to open file {}", file_path);
 
-		static std::vector<math::vec3> positions;
-		static std::vector<math::vec2> texCoords;
-		static std::vector<math::vec3> normals;
-		static std::unordered_map<std::string, unsigned int> uniqueVertices;
+		std::vector<math::vec3> positions;
+		std::vector<math::vec2> texCoords;
+		std::vector<math::vec3> normals;
+		std::unordered_map<std::string, unsigned int> uniqueVertices;
 
 		std::string line;
-		while (std::getline(file, line)) {
+		while (std::getline(file, line)) 
+		{
 			std::istringstream ss(line);
 			std::string type;
 			ss >> type;
@@ -401,31 +464,48 @@ namespace gfx
 				normals.push_back(normal);
 			}
 			else if (type == "f") { // Face
+				// Store all vertex strings in a temporary vector
+				std::vector<std::string> faceVertices;
 				std::string vertexStr;
-				for (int i = 0; i < 3; i++) { // Triangles only
-					ss >> vertexStr;
-					if (uniqueVertices.count(vertexStr) == 0) {
-						std::istringstream vs(vertexStr);
-						std::string vIndex, vtIndex, vnIndex;
+				while (ss >> vertexStr) {
+					faceVertices.push_back(vertexStr);
+				}
 
-						std::getline(vs, vIndex, '/');
-						std::getline(vs, vtIndex, '/');
-						std::getline(vs, vnIndex, '/');
+				// Check that the face has at least 3 vertices
+				if (faceVertices.size() < 3) {
+					std::cerr << "Face with fewer than 3 vertices found." << std::endl;
+					continue;
+				}
 
-						Vertex vertex{};
-						vertex.position = positions[std::stoi(vIndex) - 1];
-						vertex.texCoord = texCoords.empty() ? math::vec2(0.0f) : texCoords[std::stoi(vtIndex) - 1];
-						vertex.normal = normals.empty() ? math::vec3(0.0f) : normals[std::stoi(vnIndex) - 1];
+				// Fan triangulation: use the first vertex as a pivot
+				for (size_t i = 1; i < faceVertices.size() - 1; ++i) {
+					// The triangle consists of vertices: 0, i, i+1
+					std::string triIndices[3] = { faceVertices[0], faceVertices[i], faceVertices[i + 1] };
 
-						unsigned int index = static_cast<unsigned int>(vertices.size());
-						uniqueVertices[vertexStr] = index;
-						vertices.push_back(vertex);
+					for (int j = 0; j < 3; j++) {
+						const std::string& key = triIndices[j];
+						if (uniqueVertices.count(key) == 0) {
+							std::istringstream vs(key);
+							std::string vIndex, vtIndex, vnIndex;
+
+							std::getline(vs, vIndex, '/');
+							std::getline(vs, vtIndex, '/');
+							std::getline(vs, vnIndex, '/');
+
+							Vertex vertex{};
+							vertex.position = positions[std::stoi(vIndex) - 1];
+							vertex.texCoord = texCoords.empty() ? math::vec2(0.0f) : texCoords[std::stoi(vtIndex) - 1];
+							vertex.normal = normals.empty() ? math::vec3(0.0f) : normals[std::stoi(vnIndex) - 1];
+
+							unsigned int index = static_cast<unsigned int>(vertices.size());
+							uniqueVertices[key] = index;
+							vertices.push_back(vertex);
+						}
+						indices.push_back(uniqueVertices[key]);
 					}
-					indices.push_back(uniqueVertices[vertexStr]);
 				}
 			}
 		}
-
 		positions.clear();
 		texCoords.clear();
 		normals.clear();

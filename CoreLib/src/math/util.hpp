@@ -26,4 +26,10 @@ namespace math
 	{
 		return v0.x * v1.y - v0.y * v1.x;
 	}
+
+	template <typename T>
+	static inline rnd::f32 radians(const T& deg)
+	{
+		return deg * (180.0f / math::pi32);
+	}
 }

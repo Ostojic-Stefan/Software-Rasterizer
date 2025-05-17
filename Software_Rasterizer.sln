@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SoftwareRasterizer", "Softw
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CoreLib", "CoreLib\CoreLib.vcxproj", "{CFF42B7B-C6D4-496D-8F0C-91AED7BE78B3}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "testing", "testing\testing.vcxproj", "{E2DCB5DF-78C0-400F-A5C1-A1F161163387}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{CFF42B7B-C6D4-496D-8F0C-91AED7BE78B3}.Release|x64.Build.0 = Release|x64
 		{CFF42B7B-C6D4-496D-8F0C-91AED7BE78B3}.Release|x86.ActiveCfg = Release|Win32
 		{CFF42B7B-C6D4-496D-8F0C-91AED7BE78B3}.Release|x86.Build.0 = Release|Win32
+		{E2DCB5DF-78C0-400F-A5C1-A1F161163387}.Debug|x64.ActiveCfg = Debug|x64
+		{E2DCB5DF-78C0-400F-A5C1-A1F161163387}.Debug|x64.Build.0 = Debug|x64
+		{E2DCB5DF-78C0-400F-A5C1-A1F161163387}.Debug|x86.ActiveCfg = Debug|Win32
+		{E2DCB5DF-78C0-400F-A5C1-A1F161163387}.Debug|x86.Build.0 = Debug|Win32
+		{E2DCB5DF-78C0-400F-A5C1-A1F161163387}.Release|x64.ActiveCfg = Release|x64
+		{E2DCB5DF-78C0-400F-A5C1-A1F161163387}.Release|x64.Build.0 = Release|x64
+		{E2DCB5DF-78C0-400F-A5C1-A1F161163387}.Release|x86.ActiveCfg = Release|Win32
+		{E2DCB5DF-78C0-400F-A5C1-A1F161163387}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

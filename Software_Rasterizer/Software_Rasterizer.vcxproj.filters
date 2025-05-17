@@ -35,5 +35,14 @@
     <ClInclude Include="orbit_camera.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="movement_camera.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="light.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="another_renderer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

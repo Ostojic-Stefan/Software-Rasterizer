@@ -19,7 +19,7 @@ namespace math
 
 		constexpr vector2d(std::initializer_list<T> list)
 		{
-			ASSERT(list.size() >= 2, "vector2d must be initialized with 2 elements.");
+			ASSERT(list.size() == 2, "vector2d must be initialized with 2 elements.");
 			auto it = list.begin();
 			x = *it++;
 			y = *it++;
@@ -60,6 +60,12 @@ namespace math
 	}
 
 	template <typename T>
+	inline vector2d<T> operator*(vector2d<T> const& v, T s)
+	{
+		return { v.x * s, v.y * s };
+	}
+
+	template <typename T>
 	inline vector2d<T> operator-(vector2d<T> const& v1, vector2d<T> const& v2)
 	{
 		return { v1.x - v2.x, v1.y - v2.y };
@@ -78,6 +84,18 @@ namespace math
 	}
 
 	template <typename T>
+	inline rnd::f32 dot(const vector2d<T>& v1, const vector2d<T>& v2)
+	{
+		return v1.x * v2.x + v1.y * v2.y;
+	}
+
+	template <typename T>
+	static inline rnd::f32 length(const vector2d<T>& v)
+	{
+		return std::sqrt(dot(v, v));
+	}
+
+	template <typename T>
 	struct vector4d;
 
 	template <typename T>
@@ -92,7 +110,7 @@ namespace math
 
 		constexpr vector3d(std::initializer_list<T> list)
 		{
-			ASSERT(list.size() >= 3, "vector3d must be initialized with 3 elements.");
+			ASSERT(list.size() == 3, "vector3d must be initialized with 3 elements.");
 			auto it = list.begin();
 			x = *it++;
 			y = *it++;
@@ -196,7 +214,7 @@ namespace math
 
 		vector4d(std::initializer_list<T> list)
 		{
-			ASSERT(list.size() >= 4, "vector4d must be initialized with 4 elements.");
+			ASSERT(list.size() == 4, "vector4d must be initialized with 4 elements.");
 			auto it = list.begin();
 			x = *it++;
 			y = *it++;
@@ -212,6 +230,16 @@ namespace math
 		vector4d operator/(T val) const
 		{
 			return { x / val, y / val, z / val, w / val };
+		}
+
+		vector4d<T>& operator+=(const vector4d<T>& other)
+		{
+			x += other.x;
+			y += other.y;
+			z += other.z;
+			w += other.w;
+
+			return *this;
 		}
 
 		template <typename U>
@@ -232,6 +260,12 @@ namespace math
 	inline vector4d<T> operator/(vector4d<T> const& v, float s)
 	{
 		return { v.x / s, v.y / s, v.z / s, v.w / s };
+	}
+
+	template <typename T>
+	inline vector4d<T> operator*(vector4d<T> const& v, float s)
+	{
+		return { v.x * s, v.y * s, v.z * s, v.w * s };
 	}
 
 	template <typename T>

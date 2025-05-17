@@ -28,6 +28,8 @@ public:
 	{
 		theta += angle_radius;
 		theta = std::fmodf(theta, 2 * math::pi32);
+		if (theta < 0)
+			theta += 2 * math::pi32;
 	}
 
 	void rotate_polar(rnd::f32 angle_radius)
