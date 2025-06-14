@@ -342,7 +342,8 @@ public:
 
                 triangle_to_render tri = setup_triangle(verts_clipped, area);
 
-                draw_triangle_raw(tri);
+                draw_triangle_basic(tri.v0, tri.v1, tri.v2, area);
+                //draw_triangle_raw(tri);
                 //draw_triangle_incremental(tri);
             }
         }
@@ -414,7 +415,6 @@ public:
                         rnd::f32 t2 = tc_dy.x * tc_dy.x + tc_dy.y * tc_dy.y;
                         int mipLevel = std::ceil( std::log2(std::max(t1, t2)) * 0.5f );
 
-
                         if (mipLevel < 0)
                             mipLevel = 0;                       
 
@@ -426,13 +426,13 @@ public:
 
                         switch (mipIndex)
                         {
-                        case 0: test = rnd::red; break;
-                        case 1: test = rnd::green; break;
-                        case 2: test = rnd::blue; break;
-                        case 3: test = rnd::magenta; break;
-                        case 4: test = rnd::yellow; break;
-                        case 5: test = rnd::cyan; break;
-                        default: test = rnd::black; break;
+                            case 0: test = rnd::red; break;
+                            case 1: test = rnd::green; break;
+                            case 2: test = rnd::blue; break;
+                            case 3: test = rnd::magenta; break;
+                            case 4: test = rnd::yellow; break;
+                            case 5: test = rnd::cyan; break;
+                            default: test = rnd::black; break;
                         }
 
 
@@ -574,6 +574,7 @@ public:
                 float gamma = det01p * rcp_area;
 
                 math::vec3 color = alpha * v0.color + beta * v1.color + gamma * v2.color;
+                //rnd::color color = fragment_shader(vertex_output{});
 
                 fb.put_pixel((int)x, (int)y, rnd::to_color(color));
             }

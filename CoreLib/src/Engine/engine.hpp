@@ -7,7 +7,6 @@
 #include "types.hpp"
 #include "timer.hpp"
 #include "util.hpp"
-#include "window.hpp"
 #include "random.hpp"
 
 #include "frame_buffer.hpp"

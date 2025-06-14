@@ -21,6 +21,9 @@
     <ClCompile Include="application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="cube_scene.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="application.hpp">
@@ -42,6 +45,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="another_renderer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="scene.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cube_scene.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="the_renderer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

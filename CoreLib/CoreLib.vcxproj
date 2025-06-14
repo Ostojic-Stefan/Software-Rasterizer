@@ -167,6 +167,8 @@
     <ClInclude Include="src\Engine\graphics\graphics.hpp" />
     <ClInclude Include="src\Engine\graphics\mesh.hpp" />
     <ClInclude Include="src\Engine\graphics\texture.hpp" />
+    <ClInclude Include="src\Engine\input.hpp" />
+    <ClInclude Include="src\Engine\platform.hpp" />
     <ClInclude Include="src\Engine\random.hpp" />
     <ClInclude Include="src\Engine\timer.hpp" />
     <ClInclude Include="src\Engine\util.hpp" />
@@ -177,7 +179,6 @@
     <ClInclude Include="src\Engine\engine.hpp" />
     <ClInclude Include="src\Engine\event.hpp" />
     <ClInclude Include="src\Engine\types.hpp" />
-    <ClInclude Include="src\Engine\window.hpp" />
     <ClInclude Include="src\math\point.hpp" />
     <ClInclude Include="src\math\vector.hpp" />
     <ClInclude Include="src\Engine\graphics\color.hpp" />
@@ -186,6 +187,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Engine\graphics\texture.cpp" />
+    <ClCompile Include="src\Engine\input.cpp" />
+    <ClCompile Include="src\Engine\platform_sdl2.cpp" />
     <ClCompile Include="src\Engine\random.cpp" />
     <ClCompile Include="src\Engine\timer.cpp" />
     <ClCompile Include="src\pch.cpp">
@@ -200,7 +203,6 @@
     </ClCompile>
     <ClCompile Include="src\Engine\core.cpp" />
     <ClCompile Include="src\Engine\event.cpp" />
-    <ClCompile Include="src\Engine\window.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

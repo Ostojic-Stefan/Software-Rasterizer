@@ -66,51 +66,51 @@ public:
 	{
 	}
 
-	void key_pressed_handler(const rnd::key_event& ev)
-	{
-		switch (ev.code)
-		{
-			case rnd::key_code::W: camera.zoom(-0.1f);			 break;
-			case rnd::key_code::S: camera.zoom(0.1f);			 break;
-			case rnd::key_code::A: camera.rotate_azimuth(-0.1f); break;
-			case rnd::key_code::D: camera.rotate_azimuth(0.1f);	 break;
-		}
-	}
+	//void key_pressed_handler(const rnd::key_event& ev)
+	//{
+	//	switch (ev.code)
+	//	{
+	//		case rnd::key_code::W: camera.zoom(-0.1f);			 break;
+	//		case rnd::key_code::S: camera.zoom(0.1f);			 break;
+	//		case rnd::key_code::A: camera.rotate_azimuth(-0.1f); break;
+	//		case rnd::key_code::D: camera.rotate_azimuth(0.1f);	 break;
+	//	}
+	//}
 
-	void mouse_button_handler(const rnd::mouse_button_event& ev)
-	{
-		if (ev.down)
-		{
-			if (ev.btn == rnd::mouse_btn::left)
-			{
-				mouse_held = true;
-				rnd::i32 x, y;
-				SDL_GetMouseState(&x, &y);
-				last_mouse_pos = {(rnd::f32)x, (rnd::f32)y};
-			}
-		}
-		else
-		{
-			if (ev.btn == rnd::mouse_btn::left)
-			{
-				mouse_held = false;
-			}
-		}
-	}
+	//void mouse_button_handler(const rnd::mouse_button_event& ev)
+	//{
+	//	if (ev.down)
+	//	{
+	//		if (ev.btn == rnd::mouse_btn::left)
+	//		{
+	//			mouse_held = true;
+	//			rnd::i32 x, y;
+	//			SDL_GetMouseState(&x, &y);
+	//			last_mouse_pos = {(rnd::f32)x, (rnd::f32)y};
+	//		}
+	//	}
+	//	else
+	//	{
+	//		if (ev.btn == rnd::mouse_btn::left)
+	//		{
+	//			mouse_held = false;
+	//		}
+	//	}
+	//}
 
-	void mouse_move_handler(const rnd::mouse_move_event& ev)
-	{
-		if (mouse_held)
-		{
-			rnd::f32 dx = (ev.pos.x - last_mouse_pos.x) * sensitivity;
-			rnd::f32 dy = (ev.pos.y - last_mouse_pos.y) * sensitivity;
+	//void mouse_move_handler(const rnd::mouse_move_event& ev)
+	//{
+	//	if (mouse_held)
+	//	{
+	//		rnd::f32 dx = (ev.pos.x - last_mouse_pos.x) * sensitivity;
+	//		rnd::f32 dy = (ev.pos.y - last_mouse_pos.y) * sensitivity;
 
-			camera.rotate_azimuth(-dx);
-			camera.rotate_polar(dy);
+	//		camera.rotate_azimuth(-dx);
+	//		camera.rotate_polar(dy);
 
-			last_mouse_pos = ev.pos;
-		}
-	}
+	//		last_mouse_pos = ev.pos;
+	//	}
+	//}
 
 private:
 	orbit_camera& camera;

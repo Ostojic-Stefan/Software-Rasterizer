@@ -150,15 +150,19 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="application.cpp" />
+    <ClCompile Include="cube_scene.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="another_renderer.hpp" />
     <ClInclude Include="application.hpp" />
+    <ClInclude Include="cube_scene.hpp" />
     <ClInclude Include="light.hpp" />
     <ClInclude Include="movement_camera.hpp" />
     <ClInclude Include="orbit_camera.hpp" />
     <ClInclude Include="renderer.hpp" />
+    <ClInclude Include="scene.hpp" />
+    <ClInclude Include="the_renderer.hpp" />
     <ClInclude Include="viewport.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
