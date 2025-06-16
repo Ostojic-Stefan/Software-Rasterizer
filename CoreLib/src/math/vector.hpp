@@ -48,43 +48,43 @@ namespace math
 	};
 
 	template <typename T>
-	inline vector2d<T> operator*(float s, vector2d<T> const& v)
+	static inline vector2d<T> operator*(float s, vector2d<T> const& v)
 	{
 		return { s * v.x, s * v.y };
 	}
 
 	template <typename T>
-	inline vector2d<T> operator/(vector2d<T> const& v, T s)
+	static inline vector2d<T> operator/(vector2d<T> const& v, T s)
 	{
 		return { v.x / s, v.y / s };
 	}
 
 	template <typename T>
-	inline vector2d<T> operator*(vector2d<T> const& v, T s)
+	static inline vector2d<T> operator*(vector2d<T> const& v, T s)
 	{
 		return { v.x * s, v.y * s };
 	}
 
 	template <typename T>
-	inline vector2d<T> operator-(vector2d<T> const& v1, vector2d<T> const& v2)
+	static inline vector2d<T> operator-(vector2d<T> const& v1, vector2d<T> const& v2)
 	{
 		return { v1.x - v2.x, v1.y - v2.y };
 	}
 
 	template <typename T>
-	inline vector2d<T> operator+(vector2d<T> const& v1, vector2d<T> const& v2)
+	static inline vector2d<T> operator+(vector2d<T> const& v1, vector2d<T> const& v2)
 	{
 		return { v1.x + v2.x, v1.y + v2.y };
 	}
 
 	template <typename T>
-	inline vector2d<T> operator*(vector2d<T> const& v1, vector2d<T> const& v2)
+	static inline vector2d<T> operator*(vector2d<T> const& v1, vector2d<T> const& v2)
 	{
 		return { v1.x * v2.x, v1.y * v2.y };
 	}
 
 	template <typename T>
-	inline rnd::f32 dot(const vector2d<T>& v1, const vector2d<T>& v2)
+	static inline rnd::f32 dot(const vector2d<T>& v1, const vector2d<T>& v2)
 	{
 		return v1.x * v2.x + v1.y * v2.y;
 	}
@@ -138,49 +138,49 @@ namespace math
 	};
 
 	template <typename T>
-	inline vector3d<T> operator*(float s, vector3d<T> const& v)
+	static inline vector3d<T> operator*(float s, vector3d<T> const& v)
 	{
 		return { s * v.x, s * v.y, s * v.z };
 	}
 
 	template <typename T>
-	inline vector3d<T> operator-(vector3d<T> const& v)
+	static inline vector3d<T> operator-(vector3d<T> const& v)
 	{
 		return { -v.x, -v.y, -v.z };
 	}
 
 	template <typename T>
-	inline vector3d<T> operator*(vector3d<T> const& v, float s)
+	static inline vector3d<T> operator*(vector3d<T> const& v, float s)
 	{
 		return { s * v.x, s * v.y, s * v.z };
 	}
 
 	template <typename T>
-	inline vector3d<T> operator/(vector3d<T> const& v, float s)
+	static inline vector3d<T> operator/(vector3d<T> const& v, float s)
 	{
 		return { v.x / s, v.y / s, v.z / s };
 	}
 
 	template <typename T>
-	inline vector3d<T> operator-(vector3d<T> const& v1, vector3d<T> const& v2)
+	static inline vector3d<T> operator-(vector3d<T> const& v1, vector3d<T> const& v2)
 	{
 		return { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
 	}
 
 	template <typename T>
-	inline vector3d<T> operator+(vector3d<T> const& v1, vector3d<T> const& v2)
+	static inline vector3d<T> operator+(vector3d<T> const& v1, vector3d<T> const& v2)
 	{
 		return { v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
 	}
 
 	template <typename T>
-	inline vector3d<T> operator*(vector3d<T> const& v1, vector3d<T> const& v2)
+	static inline vector3d<T> operator*(vector3d<T> const& v1, vector3d<T> const& v2)
 	{
 		return { v1.x * v2.x, v1.y * v2.y, v1.z * v2.z };
 	}
 
 	template <typename T>
-	inline rnd::f32 dot(const vector3d<T>& v1, const vector3d<T>& v2)
+	static inline rnd::f32 dot(const vector3d<T>& v1, const vector3d<T>& v2)
 	{
 		return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 	}
@@ -251,49 +251,49 @@ namespace math
 	};
 
 	template <typename T>
-	inline vector4d<T> operator*(float s, vector4d<T> const& v)
+	static inline vector4d<T> operator*(float s, vector4d<T> const& v)
 	{
 		return { s * v.x, s * v.y, s * v.z, s * v.w };
 	}
 
 	template <typename T>
-	inline vector4d<T> operator/(vector4d<T> const& v, float s)
+	static inline vector4d<T> operator/(vector4d<T> const& v, float s)
 	{
 		return { v.x / s, v.y / s, v.z / s, v.w / s };
 	}
 
 	template <typename T>
-	inline vector4d<T> operator*(vector4d<T> const& v, float s)
+	static inline vector4d<T> operator*(vector4d<T> const& v, float s)
 	{
 		return { v.x * s, v.y * s, v.z * s, v.w * s };
 	}
 
 	template <typename T>
-	inline vector4d<T> operator-(vector4d<T> const& v0, vector4d<T> const& v1)
+	static inline vector4d<T> operator-(vector4d<T> const& v0, vector4d<T> const& v1)
 	{
 		return { v0.x - v1.x, v0.y - v1.y, v0.z - v1.z, v0.w - v1.w };
 	}
 
 	template <typename T>
-	inline vector4d<T> operator+(vector4d<T> const& v0, vector4d<T> const& v1)
+	static inline vector4d<T> operator+(vector4d<T> const& v0, vector4d<T> const& v1)
 	{
 		return { v0.x + v1.x, v0.y + v1.y, v0.z + v1.z, v0.w + v1.w };
 	}
 
 	template <typename T>
-	inline vector4d<T> operator*(vector4d<T> const& v0, vector4d<T> const& v1)
+	static inline vector4d<T> operator*(vector4d<T> const& v0, vector4d<T> const& v1)
 	{
 		return { v0.x * v1.x, v0.y * v1.y, v0.z * v1.z, v0.w * v1.w };
 	}
 
 	template <typename T>
-	inline rnd::f32 dot(const vector4d<T>& v1, const vector4d<T>& v2)
+	static inline rnd::f32 dot(const vector4d<T>& v1, const vector4d<T>& v2)
 	{
 		return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
 	}
 
 	template <typename T>
-	inline vector3d<T> reflect(const vector3d<T>& I, const vector3d<T>& N)
+	static inline vector3d<T> reflect(const vector3d<T>& I, const vector3d<T>& N)
 	{
 		return I - N * dot(N, I) * (T)2;
 	}

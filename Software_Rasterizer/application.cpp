@@ -58,20 +58,12 @@ void application::update(rnd::f32 dt)
 
 	//LOG("{}", dt);
 	//LOG("{}", camera.get_position().x);
-	//_cube_scene.update(dt);
+	_cube_scene.update(dt);
 }
+
 
 void application::render()
 {
 	fb.clear_color(rnd::dark_gray);
-	//_cube_scene.render();
-
-	for (int y = 100; y < 150; ++y)
-	{
-		for (int x = 100; x < 200; ++x)
-		{
-			fb.put_pixel(x, y, rnd::magenta);
-		}
-	}
-
+	_cube_scene.render();
 }
