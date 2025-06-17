@@ -115,6 +115,12 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)CoreLib\src;$(SolutionDir)CoreLib\third\include\;$(SolutionDir)CoreLib\src\Engine;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+      <Optimization>Disabled</Optimization>
+      <OmitFramePointers>false</OmitFramePointers>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,6 +139,8 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)CoreLib\src;$(SolutionDir)CoreLib\third\include\;$(SolutionDir)CoreLib\src\Engine;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

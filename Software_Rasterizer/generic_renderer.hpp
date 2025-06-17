@@ -101,8 +101,7 @@ struct VSOutput
 	template <typename V>
 	void setVarying(uint32_t location, V var)
 	{
-		if (location >= varyings.size())
-			varyings.resize(location + 1);
+		assert(location < MAX_VARYINGS);
 
 		if constexpr (std::is_same_v<V, math::vec2>)
 		{
@@ -122,34 +121,72 @@ struct VSOutput
 		{
 			assert(false && "Not implemented yet");
 		}
+
+		used += 1;
 	}
 
-	GenericValue getVarying(uint32_t loc) const {
-		if (loc < varyings.size())
-			return varyings[loc];
-		return GenericValue{ {0,0,0,0},0 };
+	// TODO: not the best solution
+	const size_t Size() const
+	{
+		return (size_t)used;
 	}
+
+	template <typename T>
+	T getVarying(uint32_t loc) const;
 
 	math::vec4 Position = {};
-	std::vector<GenericValue> varyings;
+
+//private:
+	int used = 0;
+	static constexpr size_t MAX_VARYINGS = 8;
+	std::array<GenericValue, MAX_VARYINGS> varyings = {0};
 };
 
+template <>
+inline math::vec2 VSOutput::getVarying(uint32_t loc) const
+{
+	assert(loc < MAX_VARYINGS);
+	const GenericValue& val = varyings[loc];
+	assert(val.count == 2);
+	math::vec2 result;
+	memcpy(&result, val.vals, sizeof(float) * val.count);
+	return result;
+}
+
+template <>
+inline math::vec3 VSOutput::getVarying(uint32_t loc) const
+{
+	assert(loc < MAX_VARYINGS);
+	const GenericValue& val = varyings[loc];
+	assert(val.count == 3);
+	math::vec3 result;
+	memcpy(&result, val.vals, sizeof(float) * val.count);
+	return result;
+}
+
+template <>
+inline math::vec4 VSOutput::getVarying(uint32_t loc) const
+{
+	assert(loc < MAX_VARYINGS);
+	const GenericValue& val = varyings[loc];
+	assert(val.count == 4);
+	math::vec4 result;
+	memcpy(&result, val.vals, sizeof(float) * val.count);
+	return result;
+}
+
+template <typename ShaderProgram>
 struct Renderer
 {
 	Renderer(rnd::framebuffer& fb)
 		:
 		_fb(fb)
 	{
-
-	}
-	void BindVertexShader(std::function<VSOutput(const VsInput&)> vertexShader)
-	{
-		this->vertexShader = std::move(vertexShader);
 	}
 
-	void BindFragmentShader(std::function<math::vec4(const VSOutput&)> fragmentShader)
+	void BindShaderProgram(const ShaderProgram* program)
 	{
-		this->fragmentShader = std::move(fragmentShader);
+		this->program = program;
 	}
 
 	int CreateVertexBuffer(const void* data, size_t stride)
@@ -207,9 +244,9 @@ struct Renderer
 			}
 
 			VSOutput vsout[3];
-			vsout[0] = vertexShader(input0);
-			vsout[1] = vertexShader(input1);
-			vsout[2] = vertexShader(input2);
+			vsout[0] = program->vs(input0);
+			vsout[1] = program->vs(input1);
+			vsout[2] = program->vs(input2);
 
 			vsout[0].Position = _viewport.transform(perspective_divide( vsout[0].Position ));
 			vsout[1].Position = _viewport.transform(perspective_divide( vsout[1].Position ));
@@ -265,21 +302,21 @@ private:
 				float gamma = det01p * rcp_area;
 
 				VSOutput interpolated;
-				interpolated.varyings.resize(v0.varyings.size());
+				//interpolated.varyings.resize(v0.varyings.size());
 				interpolated.Position = v0.Position * alpha + v1.Position * beta + v2.Position * gamma;
 
 				// for each vertex attribute
-				for (int j = 0; j < v0.varyings.size(); ++j)
+				for (int j = 0; j < v0.Size(); ++j)
 				{
-					GenericValue a0 = v0.varyings[j];
-					GenericValue a1 = v1.varyings[j];
-					GenericValue a2 = v2.varyings[j];
+					const GenericValue& a0 = v0.varyings[j];
+					const GenericValue& a1 = v1.varyings[j];
+					const GenericValue& a2 = v2.varyings[j];
 
 					GenericValue interp = InterpolateAttrib(a0, a1, a2, alpha, beta, gamma);
 					interpolated.varyings[j] = interp;
 				}
 
-				math::vec4 color = fragmentShader(interpolated);
+				math::vec4 color = program->fs(interpolated);
 
 				_fb.put_pixel((int)x, (int)y, rnd::to_color(color));
 			}
@@ -294,11 +331,11 @@ private:
 		v.z *= v.w;
 		return v;
 	}
-	GenericValue InterpolateAttrib(GenericValue a0, GenericValue a1, GenericValue a2, float alpha, float beta, float gamma)
+	GenericValue InterpolateAttrib(const GenericValue& a0, const GenericValue& a1, const GenericValue& a2, float alpha, float beta, float gamma)
 	{
 		size_t cnt = a0.count;
 
-		GenericValue result = {};
+		GenericValue result = {0};
 		result.count = cnt;
 
 		for (size_t i = 0; i < cnt; ++i)
@@ -311,8 +348,9 @@ private:
 	rnd::framebuffer& _fb;
 
 	const VertexBuffer* boundBuffer = nullptr;
-	std::function<VSOutput(const VsInput&)> vertexShader;
-	std::function<math::vec4(const VSOutput&)> fragmentShader;
+	const ShaderProgram* program = nullptr;
+	//std::function<VSOutput(const VsInput&)> vertexShader;
+	//std::function<math::vec4(const VSOutput&)> fragmentShader;
 	std::vector<VertexBuffer> vertexBuffers;
 
 	viewport _viewport = { 0, 0, 800, 600 };

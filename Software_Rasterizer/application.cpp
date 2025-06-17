@@ -5,7 +5,8 @@
 application::application()
 	:
 	fb(800, 600),
-	_cube_scene(fb)
+	//_cube_scene(fb),
+	renderer(fb)
 {
 	platform::initialize({
 		.title = "Software Rasterizer",
@@ -14,6 +15,31 @@ application::application()
 	});
 
 	rnd::input::init();
+
+	std::vector<rnd::u16> indices = { 0, 1, 2 };
+
+	std::vector<shader_program::vertex_input> vertices = 
+	{
+		shader_program::vertex_input{
+			.position = {-0.5f, -0.5f, 0.f},
+			.color = {1.0f, 0.f, 0.f, 1.f},
+		},
+		shader_program::vertex_input{
+			.position = {0.5f, -0.5f, 0.f},
+			.color = {0.f, 1.f, 0.f, 1.f},
+		},
+		shader_program::vertex_input{
+			.position = {0.5f, 0.5f, 0.f},
+			.color = {0.f, 0.f, 1.f, 1.f},
+		},
+		shader_program::vertex_input{
+			.position = {-0.5f, 0.5f, 0.f},
+			.color = {1.f, 1.f, 1.f, 1.f},
+		}
+	};
+
+	renderer.bind_index_buffer(indices);
+	renderer.bind_vertex_buffer(vertices);
 }
 
 application::~application()
@@ -56,14 +82,15 @@ void application::update(rnd::f32 dt)
 	auto pos = rnd::input::get_mouse_pos();
 	// LOG("x = {}, y = {}", pos.x, pos.y);
 
-	//LOG("{}", dt);
+	LOG("{}", 1.f / dt);
 	//LOG("{}", camera.get_position().x);
-	_cube_scene.update(dt);
+	//_cube_scene.update(dt);
 }
 
 
 void application::render()
 {
 	fb.clear_color(rnd::dark_gray);
-	_cube_scene.render();
+	renderer.render_indexed();
+	//_cube_scene.render();
 }

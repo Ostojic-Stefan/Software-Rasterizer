@@ -6,6 +6,8 @@
 #include "cube_scene.hpp"
 #include "platform.hpp"
 
+#include "the_renderer.hpp"
+
 class application
 {
 public:
@@ -22,5 +24,7 @@ private:
 	rnd::f32 dt = 0.f;
 	rnd::f32 total_time = 0.f;
 
-	cube_plain_scene _cube_scene;
+	the_renderer<shader_program> renderer;
+
+	//cube_plain_scene _cube_scene;
 };
