@@ -7,6 +7,8 @@
 #include "generic_renderer.hpp"
 #include <graphics/texture.hpp>
 
+#include "graphics/mesh.hpp"
+
 struct BasicShaderProgram
 {
 	struct VertexShader
@@ -44,6 +46,8 @@ private:
 	
 	int vboId;
 	int iboId;
+
+	gfx::mesh cube_mesh;
 
 	//rnd::orbit_camera _camera;
 	//rnd::orbit_camera_controller _cam_ctrl;

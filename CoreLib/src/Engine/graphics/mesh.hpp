@@ -14,7 +14,7 @@ namespace gfx
 		std::vector<math::vec3> normals;
 
 		std::vector<math::vec4> colors;
-		std::vector<rnd::u32>	indices;
+		std::vector<rnd::u16>	indices;
 	};
 
 	static inline mesh get_tessellated_plane_mesh(unsigned int tessellationX, unsigned int tessellationY)
@@ -23,7 +23,7 @@ namespace gfx
 		std::vector<math::vec2> tex_coords;
 		std::vector<math::vec3> normals;
 		std::vector<math::vec4> colors;
-		std::vector<rnd::u32> indices;
+		std::vector<rnd::u16> indices;
 
 		// The plane extends from -0.5 to 0.5 in both X and Y.
 		// Compute the size of each cell along x and y.
@@ -106,7 +106,7 @@ namespace gfx
 			{ 0, 0, 1 },
 		};
 
-		static const std::vector<rnd::u32> indices = {
+		static const std::vector<rnd::u16> indices = {
 			0,1,2
 		};
 
@@ -143,7 +143,7 @@ namespace gfx
 			{ 0, 0, 1 },
 		};
 
-		static const std::vector<rnd::u32> indices = {
+		static const std::vector<rnd::u16> indices = {
 			0,1,2,
 			1,3,2
 		};
@@ -192,7 +192,7 @@ namespace gfx
 			{ size,  size,  size},
 		};
 		
-		static std::vector<rnd::u32> indices = {
+		static std::vector<rnd::u16> indices = {
 			// -X face
 			0,  2,  1,
 			1,  2,  3,
@@ -431,7 +431,7 @@ namespace gfx
 	static inline mesh load_mesh_from_obj(std::string_view file_path)
 	{
 		std::vector<Vertex> vertices;
-		std::vector<unsigned int> indices;
+		std::vector<uint16_t> indices;
 
 		std::ifstream file(file_path.data());
 		ASSERT(file.is_open(), "Failed to open file {}", file_path);
