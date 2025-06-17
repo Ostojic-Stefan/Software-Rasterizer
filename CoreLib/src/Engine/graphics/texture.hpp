@@ -11,6 +11,7 @@ namespace gfx
 	class surface
 	{
 	public:
+		surface() = default;
 		surface(rnd::u32 width, rnd::u32 height);
 
 		static surface from_file(std::string_view file_path);

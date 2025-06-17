@@ -1,312 +1,460 @@
 #pragma once
 
 #include <initializer_list>
+#include <cmath>
 #include "types.hpp"
+#include <cassert>
+#include <immintrin.h>
 
 namespace math
 {
-	template <typename T>
-	struct vector3d;
+    template <typename T>
+    struct vector2d;
 
-	template <typename T>
-	struct vector2d
-	{
-		T x, y;
+    template <typename T>
+    struct vector3d;
 
-		constexpr vector2d() = default;
+    template <typename T>
+    struct vector4d;
 
-		constexpr vector2d(T val) : x(val), y(val) {}
+    template <typename T>
+    struct vector2d
+    {
+        union
+        {
+            struct { T x, y; };
+            T values[2];
+        };
 
-		constexpr vector2d(std::initializer_list<T> list)
-		{
-			ASSERT(list.size() == 2, "vector2d must be initialized with 2 elements.");
-			auto it = list.begin();
-			x = *it++;
-			y = *it++;
-		}
-		
-		template <typename U>
-		operator vector2d<U>() const
-		{
-			vector2d<U> ret{ static_cast<U>(x), static_cast<U>(y) };
-			return ret;
-		}
+        constexpr vector2d()
+            : x(T(0)), y(T(0))
+        {}
 
-		template <typename U>
-		operator vector3d<U>() const
-		{
-			vector3d<U> ret{ static_cast<U>(x), static_cast<U>(y), static_cast<U>(0) };
-			return ret;
-		}
+        constexpr explicit vector2d(T val)
+            : x(val), y(val)
+        {}
 
-		vector2d<T> operator+=(const vector2d<T>& other)
-		{
-			x += other.x;
-			y += other.y;
-			return *this;
-		}
-	};
+        constexpr vector2d(T _x, T _y)
+            : x(_x), y(_y)
+        {}
 
-	template <typename T>
-	static inline vector2d<T> operator*(float s, vector2d<T> const& v)
-	{
-		return { s * v.x, s * v.y };
-	}
+        constexpr vector2d(std::initializer_list<T> list)
+        {
+            ASSERT(list.size() == 2, "vector2d must be initialized with 2 elements.");
+            auto it = list.begin();
+            x = *it++;
+            y = *it++;
+        }
 
-	template <typename T>
-	static inline vector2d<T> operator/(vector2d<T> const& v, T s)
-	{
-		return { v.x / s, v.y / s };
-	}
+        template <typename U>
+        operator vector2d<U>() const
+        {
+            return vector2d<U>{ static_cast<U>(x), static_cast<U>(y) };
+        }
 
-	template <typename T>
-	static inline vector2d<T> operator*(vector2d<T> const& v, T s)
-	{
-		return { v.x * s, v.y * s };
-	}
+        template <typename U>
+        operator vector3d<U>() const
+        {
+            return vector3d<U>{ static_cast<U>(x), static_cast<U>(y), static_cast<U>(0) };
+        }
 
-	template <typename T>
-	static inline vector2d<T> operator-(vector2d<T> const& v1, vector2d<T> const& v2)
-	{
-		return { v1.x - v2.x, v1.y - v2.y };
-	}
+        vector2d<T>& operator+=(const vector2d<T>& other)
+        {
+            x += other.x;
+            y += other.y;
+            return *this;
+        }
 
-	template <typename T>
-	static inline vector2d<T> operator+(vector2d<T> const& v1, vector2d<T> const& v2)
-	{
-		return { v1.x + v2.x, v1.y + v2.y };
-	}
+        vector2d<T>& operator-=(const vector2d<T>& other)
+        {
+            x -= other.x;
+            y -= other.y;
+            return *this;
+        }
 
-	template <typename T>
-	static inline vector2d<T> operator*(vector2d<T> const& v1, vector2d<T> const& v2)
-	{
-		return { v1.x * v2.x, v1.y * v2.y };
-	}
+        vector2d<T>& operator*=(T scalar)
+        {
+            x *= scalar;
+            y *= scalar;
+            return *this;
+        }
 
-	template <typename T>
-	static inline rnd::f32 dot(const vector2d<T>& v1, const vector2d<T>& v2)
-	{
-		return v1.x * v2.x + v1.y * v2.y;
-	}
+        vector2d<T>& operator/=(T scalar)
+        {
+            x /= scalar;
+            y /= scalar;
+            return *this;
+        }
+    };
 
-	template <typename T>
-	static inline rnd::f32 length(const vector2d<T>& v)
-	{
-		return std::sqrt(dot(v, v));
-	}
+    template <typename T>
+    inline vector2d<T> operator+(vector2d<T> const& a, vector2d<T> const& b)
+    {
+        return { a.x + b.x, a.y + b.y };
+    }
 
-	template <typename T>
-	struct vector4d;
+    template <typename T>
+    inline vector2d<T> operator-(vector2d<T> const& a, vector2d<T> const& b)
+    {
+        return { a.x - b.x, a.y - b.y };
+    }
 
-	template <typename T>
-	struct vector3d
-	{
-		T x, y, z;
+    template <typename T>
+    inline vector2d<T> operator-(vector2d<T> const& v)
+    {
+        return { -v.x, -v.y };
+    }
 
-		constexpr vector3d() = default;
+    template <typename T>
+    inline vector2d<T> operator*(vector2d<T> const& v, T s)
+    {
+        return { v.x * s, v.y * s };
+    }
 
-		constexpr vector3d(T val) : x(val), y(val), z(val) {}
-		constexpr vector3d(T x, T y, T z) : x(x), y(y), z(z) {}
+    template <typename T>
+    inline vector2d<T> operator*(T s, vector2d<T> const& v)
+    {
+        return { v.x * s, v.y * s };
+    }
 
-		constexpr vector3d(std::initializer_list<T> list)
-		{
-			ASSERT(list.size() == 3, "vector3d must be initialized with 3 elements.");
-			auto it = list.begin();
-			x = *it++;
-			y = *it++;
-			z = *it++;
-		}
+    template <typename T>
+    inline vector2d<T> operator/(vector2d<T> const& v, T s)
+    {
+        return { v.x / s, v.y / s };
+    }
 
-		vector3d operator/(T val) const
-		{
-			return { x / val, y / val, z / val };
-		}
+    template <typename T>
+    inline vector2d<T> operator*(vector2d<T> const& a, vector2d<T> const& b)
+    {
+        return { a.x * b.x, a.y * b.y };
+    }
 
-		template <typename U>
-		operator vector2d<U>() const
-		{
-			vector2d<U> ret{ static_cast<U>(x), static_cast<U>(y) };
-			return ret;
-		}
+    template <typename T>
+    inline vector2d<T> operator/(vector2d<T> const& a, vector2d<T> const& b)
+    {
+        return { a.x / b.x, a.y / b.y };
+    }
 
-		template <typename U>
-		operator vector4d<U>() const
-		{
-			vector4d<U> ret{ static_cast<U>(x), static_cast<U>(y), static_cast<U>(z), static_cast<U>(0) };
-			return ret;
-		}
-	};
+    template <typename T>
+    inline T dot(const vector2d<T>& a, const vector2d<T>& b)
+    {
+        return (a.x * b.x) + (a.y * b.y);
+    }
 
-	template <typename T>
-	static inline vector3d<T> operator*(float s, vector3d<T> const& v)
-	{
-		return { s * v.x, s * v.y, s * v.z };
-	}
+    template <typename T>
+    inline T length(const vector2d<T>& v)
+    {
+        return std::sqrt(dot(v, v));
+    }
 
-	template <typename T>
-	static inline vector3d<T> operator-(vector3d<T> const& v)
-	{
-		return { -v.x, -v.y, -v.z };
-	}
+    template <typename T>
+    inline vector2d<T> normalize(const vector2d<T>& v)
+    {
+        T len = length(v);
+        assert(len != T(0) && "Cannot normalize a zero-length vector2d");
+        return v / len;
+    }
 
-	template <typename T>
-	static inline vector3d<T> operator*(vector3d<T> const& v, float s)
-	{
-		return { s * v.x, s * v.y, s * v.z };
-	}
+    template <typename T>
+    struct vector3d
+    {
+        union
+        {
+            struct { T x, y, z; };
+            T values[3];
+        };
 
-	template <typename T>
-	static inline vector3d<T> operator/(vector3d<T> const& v, float s)
-	{
-		return { v.x / s, v.y / s, v.z / s };
-	}
+        constexpr vector3d()
+            : x(T(0)), y(T(0)), z(T(0))
+        {}
 
-	template <typename T>
-	static inline vector3d<T> operator-(vector3d<T> const& v1, vector3d<T> const& v2)
-	{
-		return { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
-	}
+        constexpr explicit vector3d(T val)
+            : x(val), y(val), z(val)
+        {}
 
-	template <typename T>
-	static inline vector3d<T> operator+(vector3d<T> const& v1, vector3d<T> const& v2)
-	{
-		return { v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
-	}
+        constexpr vector3d(T _x, T _y, T _z)
+            : x(_x), y(_y), z(_z)
+        {}
 
-	template <typename T>
-	static inline vector3d<T> operator*(vector3d<T> const& v1, vector3d<T> const& v2)
-	{
-		return { v1.x * v2.x, v1.y * v2.y, v1.z * v2.z };
-	}
+        constexpr vector3d(std::initializer_list<T> list)
+        {
+            assert(list.size() == 3 && "vector3d must be initialized with 3 elements.");
+            auto it = list.begin();
+            x = *it++;
+            y = *it++;
+            z = *it++;
+        }
 
-	template <typename T>
-	static inline rnd::f32 dot(const vector3d<T>& v1, const vector3d<T>& v2)
-	{
-		return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-	}
+        template <typename U>
+        operator vector2d<U>() const
+        {
+            return vector2d<U>{ static_cast<U>(x), static_cast<U>(y) };
+        }
 
-	template <typename T>
-	static inline rnd::f32 length(const vector3d<T>& v)
-	{
-		return std::sqrt(dot(v, v));
-	}
+        template <typename U>
+        operator vector4d<U>() const
+        {
+            return vector4d<U>{ static_cast<U>(x),
+                static_cast<U>(y),
+                static_cast<U>(z),
+                static_cast<U>(0) };
+        }
 
-	template <typename T>
-	static inline vector3d<T> normalize(const vector3d<T>& v)
-	{
-		return v / length(v);
-	}
+        vector3d<T>& operator+=(const vector3d<T>& other)
+        {
+            x += other.x;
+            y += other.y;
+            z += other.z;
+            return *this;
+        }
 
-	template <typename T>
-	static inline vector3d<T> cross(const vector3d<T>& v1, const vector3d<T>& v2)
-	{
-		return { v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.z };
-	}
+        vector3d<T>& operator-=(const vector3d<T>& other)
+        {
+            x -= other.x;
+            y -= other.y;
+            z -= other.z;
+            return *this;
+        }
 
-	template <typename T>
-	struct vector4d
-	{
-		T x, y, z, w;
+        vector3d<T>& operator*=(T scalar)
+        {
+            x *= scalar;
+            y *= scalar;
+            z *= scalar;
+            return *this;
+        }
 
-		vector4d(T val) : x(val), y(val), z(val), w(val) {}
+        vector3d<T>& operator/=(T scalar)
+        {
+            x /= scalar;
+            y /= scalar;
+            z /= scalar;
+            return *this;
+        }
 
-		vector4d() = default;
+        vector3d<T> operator/(T scalar) const
+        {
+            return { x / scalar, y / scalar, z / scalar };
+        }
+    };
 
-		vector4d(std::initializer_list<T> list)
-		{
-			ASSERT(list.size() == 4, "vector4d must be initialized with 4 elements.");
-			auto it = list.begin();
-			x = *it++;
-			y = *it++;
-			z = *it++;
-			w = *it++;
-		}
+    template <typename T>
+    inline vector3d<T> operator+(vector3d<T> const& a, vector3d<T> const& b)
+    {
+        return { a.x + b.x, a.y + b.y, a.z + b.z };
+    }
 
-		vector4d(vector3d<T> v, T s)
-			:
-			x(v.x), y(v.y), z(v.z), w(s)
-		{}
+    template <typename T>
+    inline vector3d<T> operator-(vector3d<T> const& a, vector3d<T> const& b)
+    {
+        return { a.x - b.x, a.y - b.y, a.z - b.z };
+    }
 
-		vector4d operator/(T val) const
-		{
-			return { x / val, y / val, z / val, w / val };
-		}
+    template <typename T>
+    inline vector3d<T> operator-(vector3d<T> const& v)
+    {
+        return { -v.x, -v.y, -v.z };
+    }
 
-		vector4d<T>& operator+=(const vector4d<T>& other)
-		{
-			x += other.x;
-			y += other.y;
-			z += other.z;
-			w += other.w;
+    template <typename T>
+    inline vector3d<T> operator*(vector3d<T> const& v, T s)
+    {
+        return { v.x * s, v.y * s, v.z * s };
+    }
 
-			return *this;
-		}
+    template <typename T>
+    inline vector3d<T> operator*(T s, vector3d<T> const& v)
+    {
+        return { v.x * s, v.y * s, v.z * s };
+    }
 
-		template <typename U>
-		operator vector3d<U>() const
-		{
-			vector3d<U> ret{ static_cast<U>(x), static_cast<U>(y), static_cast<U>(z) };
-			return ret;
-		}
-	};
+    template <typename T>
+    inline vector3d<T> operator/(vector3d<T> const& v, T s)
+    {
+        return { v.x / s, v.y / s, v.z / s };
+    }
 
-	template <typename T>
-	static inline vector4d<T> operator*(float s, vector4d<T> const& v)
-	{
-		return { s * v.x, s * v.y, s * v.z, s * v.w };
-	}
+    template <typename T>
+    inline vector3d<T> operator*(vector3d<T> const& a, vector3d<T> const& b)
+    {
+        return { a.x * b.x, a.y * b.y, a.z * b.z };
+    }
 
-	template <typename T>
-	static inline vector4d<T> operator/(vector4d<T> const& v, float s)
-	{
-		return { v.x / s, v.y / s, v.z / s, v.w / s };
-	}
+    template <typename T>
+    inline T dot(const vector3d<T>& a, const vector3d<T>& b)
+    {
+        return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
+    }
 
-	template <typename T>
-	static inline vector4d<T> operator*(vector4d<T> const& v, float s)
-	{
-		return { v.x * s, v.y * s, v.z * s, v.w * s };
-	}
+    template <typename T>
+    inline T length(const vector3d<T>& v)
+    {
+        return std::sqrt(dot(v, v));
+    }
 
-	template <typename T>
-	static inline vector4d<T> operator-(vector4d<T> const& v0, vector4d<T> const& v1)
-	{
-		return { v0.x - v1.x, v0.y - v1.y, v0.z - v1.z, v0.w - v1.w };
-	}
+    template <typename T>
+    inline vector3d<T> normalize(const vector3d<T>& v)
+    {
+        T len = length(v);
+        assert(len != T(0) && "Cannot normalize a zero-length vector3d");
+        return v / len;
+    }
 
-	template <typename T>
-	static inline vector4d<T> operator+(vector4d<T> const& v0, vector4d<T> const& v1)
-	{
-		return { v0.x + v1.x, v0.y + v1.y, v0.z + v1.z, v0.w + v1.w };
-	}
+    template <typename T>
+    inline vector3d<T> cross(const vector3d<T>& a, const vector3d<T>& b)
+    {
+        return {
+            (a.y * b.z) - (a.z * b.y),
+            (a.z * b.x) - (a.x * b.z),
+            (a.x * b.y) - (a.y * b.x)
+        };
+    }
 
-	template <typename T>
-	static inline vector4d<T> operator*(vector4d<T> const& v0, vector4d<T> const& v1)
-	{
-		return { v0.x * v1.x, v0.y * v1.y, v0.z * v1.z, v0.w * v1.w };
-	}
+    template <typename T>
+    inline vector3d<T> reflect(const vector3d<T>& I, const vector3d<T>& N)
+    {
+        return I - N * (dot(N, I) * T(2));
+    }
 
-	template <typename T>
-	static inline rnd::f32 dot(const vector4d<T>& v1, const vector4d<T>& v2)
-	{
-		return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
-	}
+    template <typename T>
+    struct vector4d
+    {
+        union
+        {
+            struct { T x, y, z, w; };
+            T values[4];
+            __m128 _v;
+        };
 
-	template <typename T>
-	static inline vector3d<T> reflect(const vector3d<T>& I, const vector3d<T>& N)
-	{
-		return I - N * dot(N, I) * (T)2;
-	}
+        constexpr vector4d()
+            : x(T(0)), y(T(0)), z(T(0)), w(T(0))
+        {}
 
-	using vec2  = vector2d<rnd::f32>;
-	using vec2d = vector2d<rnd::f64>;
-	using vec2i = vector2d<rnd::i32>;
+        constexpr explicit vector4d(T val)
+            : x(val), y(val), z(val), w(val)
+        {}
 
-	using vec3  = vector3d<rnd::f32>;
-	using vec3d = vector3d<rnd::f64>;
-	using vec3i = vector3d<rnd::i32>;
+        constexpr vector4d(std::initializer_list<T> list)
+        {
+            assert(list.size() == 4 && "vector4d must be initialized with 4 elements.");
+            auto it = list.begin();
+            x = *it++;
+            y = *it++;
+            z = *it++;
+            w = *it++;
+        }
 
-	using vec4  = vector4d<rnd::f32>;
-	using vec4d = vector4d<rnd::f64>;
-	using vec4i = vector4d<rnd::i32>;
+        constexpr vector4d(const vector3d<T>& v, T _w)
+            : x(v.x), y(v.y), z(v.z), w(_w)
+        {}
+
+        template <typename U>
+        operator vector3d<U>() const
+        {
+            return vector3d<U>{ static_cast<U>(x),
+                static_cast<U>(y),
+                static_cast<U>(z) };
+        }
+
+        vector4d<T>& operator+=(const vector4d<T>& other)
+        {
+            x += other.x;
+            y += other.y;
+            z += other.z;
+            w += other.w;
+            return *this;
+        }
+
+        vector4d<T>& operator-=(const vector4d<T>& other)
+        {
+            x -= other.x;
+            y -= other.y;
+            z -= other.z;
+            w -= other.w;
+            return *this;
+        }
+
+        vector4d<T>& operator*=(T scalar)
+        {
+            x *= scalar;
+            y *= scalar;
+            z *= scalar;
+            w *= scalar;
+            return *this;
+        }
+
+        vector4d<T>& operator/=(T scalar)
+        {
+            x /= scalar;
+            y /= scalar;
+            z /= scalar;
+            w /= scalar;
+            return *this;
+        }
+
+        vector4d<T> operator/(T scalar) const
+        {
+            return { x / scalar, y / scalar, z / scalar, w / scalar };
+        }
+    };
+
+    template <typename T>
+    inline vector4d<T> operator+(vector4d<T> const& a, vector4d<T> const& b)
+    {
+        return { a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w };
+    }
+
+    template <typename T>
+    inline vector4d<T> operator-(vector4d<T> const& a, vector4d<T> const& b)
+    {
+        return { a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w };
+    }
+
+    template <typename T>
+    inline vector4d<T> operator-(vector4d<T> const& v)
+    {
+        return { -v.x, -v.y, -v.z, -v.w };
+    }
+
+    template <typename T>
+    inline vector4d<T> operator*(vector4d<T> const& v, T s)
+    {
+        return { v.x * s, v.y * s, v.z * s, v.w * s };
+    }
+
+    template <typename T>
+    inline vector4d<T> operator*(T s, vector4d<T> const& v)
+    {
+        return { v.x * s, v.y * s, v.z * s, v.w * s };
+    }
+
+    template <typename T>
+    inline vector4d<T> operator/(vector4d<T> const& v, T s)
+    {
+        return { v.x / s, v.y / s, v.z / s, v.w / s };
+    }
+
+    template <typename T>
+    inline vector4d<T> operator*(vector4d<T> const& a, vector4d<T> const& b)
+    {
+        return { a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w };
+    }
+
+    template <typename T>
+    inline T dot(const vector4d<T>& a, const vector4d<T>& b)
+    {
+        return (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
+    }
+
+    using vec2 = vector2d<rnd::f32>;
+    using vec2d = vector2d<rnd::f64>;
+    using vec2i = vector2d<rnd::i32>;
+
+    using vec3 = vector3d<rnd::f32>;
+    using vec3d = vector3d<rnd::f64>;
+    using vec3i = vector3d<rnd::i32>;
+
+    using vec4 = vector4d<rnd::f32>;
+    using vec4d = vector4d<rnd::f64>;
+    using vec4i = vector4d<rnd::i32>;
 }

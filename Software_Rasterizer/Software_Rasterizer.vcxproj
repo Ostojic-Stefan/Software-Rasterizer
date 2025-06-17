@@ -166,6 +166,7 @@
     <ClInclude Include="application.hpp" />
     <ClInclude Include="cube_scene.hpp" />
     <ClInclude Include="generic_renderer.hpp" />
+    <ClInclude Include="generic_value.hpp" />
     <ClInclude Include="light.hpp" />
     <ClInclude Include="movement_camera.hpp" />
     <ClInclude Include="orbit_camera.hpp" />

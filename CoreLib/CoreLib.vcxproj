@@ -170,6 +170,7 @@
     <ClInclude Include="src\Engine\input.hpp" />
     <ClInclude Include="src\Engine\platform.hpp" />
     <ClInclude Include="src\Engine\random.hpp" />
+    <ClInclude Include="src\Engine\simd.h" />
     <ClInclude Include="src\Engine\timer.hpp" />
     <ClInclude Include="src\Engine\util.hpp" />
     <ClInclude Include="src\math\matrix.hpp" />

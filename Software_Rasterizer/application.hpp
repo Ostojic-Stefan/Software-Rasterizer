@@ -24,7 +24,7 @@ private:
 	rnd::f32 dt = 0.f;
 	rnd::f32 total_time = 0.f;
 
-	the_renderer<shader_program> renderer;
+	// the_renderer<shader_program> renderer;
 
-	//cube_plain_scene _cube_scene;
+	cube_plain_scene _cube_scene;
 };

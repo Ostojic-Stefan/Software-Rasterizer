@@ -11,12 +11,8 @@
 #include "math/vector.hpp"
 
 #include "viewport.hpp"
+#include "generic_value.hpp"
 
-struct GenericValue
-{
-	float vals[4];
-	int count;
-};
 
 enum class AttribType { Float };
 struct VertexAttrib
@@ -33,6 +29,12 @@ struct VertexBuffer
 	size_t stride;
 
 	std::vector<VertexAttrib> attribs;
+};
+
+struct IndexBuffer
+{
+	const uint16_t* data;
+	uint32_t count;
 };
 
 static inline GenericValue ExtractValue(const uint8_t* ptr, const VertexAttrib& attribute)
@@ -199,6 +201,20 @@ struct Renderer
 		return vertexBuffers.size() - 1;
 	}
 
+	int CreateIndexBuffer(const uint16_t* data, size_t cnt)
+	{
+		IndexBuffer ibo = { data, cnt };
+		indexBuffers.push_back(ibo);
+		return indexBuffers.size() - 1;
+	}
+
+	void BindIndexBuffer(int bufferId)
+	{
+		// TODO: add state for no bound buffer. (e.g. -1)
+		assert(bufferId < indexBuffers.size());
+		boundIndexBuffer = &indexBuffers[bufferId];
+	}
+
 	void BindVertexBuffer(int bufferId)
 	{
 		// TODO: add state for no bound buffer. (e.g. -1)
@@ -210,6 +226,88 @@ struct Renderer
 	{
 		VertexBuffer& vbo = vertexBuffers[bufferId];
 		vbo.attribs.push_back(attrib);
+	}
+
+	void DrawIndexed(size_t num_indices)
+	{
+		assert(boundBuffer);
+		assert(boundIndexBuffer);
+
+		const std::vector<VertexAttrib>& attributes = boundBuffer->attribs;
+
+		size_t nTriangles = num_indices / 3;
+
+		// for each triangle
+		for (int i = 0; i < nTriangles; ++i)
+		{
+			VsInput input0{};
+			VsInput input1{};
+			VsInput input2{};
+
+			int idx0 = boundIndexBuffer->data[i * 3 + 0];
+			int idx1 = boundIndexBuffer->data[i * 3 + 1];
+			int idx2 = boundIndexBuffer->data[i * 3 + 2];
+
+			// for each attribute in the vertex
+			for (const VertexAttrib& a : attributes)
+			{
+				uint8_t* ptr0 = boundBuffer->data + boundBuffer->stride * idx0 + a.offset;
+				uint8_t* ptr1 = boundBuffer->data + boundBuffer->stride * idx1 + a.offset;
+				uint8_t* ptr2 = boundBuffer->data + boundBuffer->stride * idx2 + a.offset;
+				
+				GenericValue val0 = ExtractValue(ptr0, a);
+				GenericValue val1 = ExtractValue(ptr1, a);
+				GenericValue val2 = ExtractValue(ptr2, a);
+
+				input0.Set(a.slot, val0);
+				input1.Set(a.slot, val1);
+				input2.Set(a.slot, val2);
+			}
+
+			VSOutput vsout[3];
+
+			// vertex shader
+			vsout[0] = program->vs(input0);
+			vsout[1] = program->vs(input1);
+			vsout[2] = program->vs(input2);
+
+			// perspective division and viewport trasnform
+			vsout[0].Position = _viewport.transform(perspective_divide(vsout[0].Position));
+			vsout[1].Position = _viewport.transform(perspective_divide(vsout[1].Position));
+			vsout[2].Position = _viewport.transform(perspective_divide(vsout[2].Position));
+
+			// perspective correction
+			std::size_t sz = vsout->Size();
+			for (int j = 0; j < sz; ++j)
+			{
+				GenericValue& gv0 = vsout[0].varyings[j];
+				GenericValue& gv1 = vsout[1].varyings[j];
+				GenericValue& gv2 = vsout[2].varyings[j];
+
+				const std::size_t sz = gv0.count;
+				for (int j = 0; j < sz; ++j)
+				{
+					gv0.vals[j] = gv0.vals[j] * vsout[0].Position.w;
+					gv1.vals[j] = gv1.vals[j] * vsout[1].Position.w;
+					gv2.vals[j] = gv2.vals[j] * vsout[2].Position.w;
+				}
+			}
+
+			rnd::f32 area = math::det_2d(
+				vsout[1].Position - vsout[0].Position,
+				vsout[2].Position - vsout[0].Position
+			);
+
+			// backface culling
+			const rnd::b8 ccw = area < 0.f;
+			if (!ccw)
+				continue;
+			std::swap(vsout[1], vsout[2]);
+			area = -area;
+
+			draw_triangle_basic(vsout[0], vsout[1], vsout[2], area);
+		}
+
 	}
 
 	void Draw(size_t num_vertices)
@@ -225,7 +323,6 @@ struct Renderer
 			VsInput input0{};
 			VsInput input1{};
 			VsInput input2{};
-
 
 			// for each attribute in the vertex
 			for (const VertexAttrib& a : attributes)
@@ -301,9 +398,11 @@ private:
 				float beta = det20p * rcp_area;
 				float gamma = det01p * rcp_area;
 
+				float oneOverZ = alpha * v0.Position.w + beta * v1.Position.w + gamma * v2.Position.w;
+				float z = 1.f / oneOverZ;
+
 				VSOutput interpolated;
-				//interpolated.varyings.resize(v0.varyings.size());
-				interpolated.Position = v0.Position * alpha + v1.Position * beta + v2.Position * gamma;
+				interpolated.Position = (v0.Position * alpha + v1.Position * beta + v2.Position * gamma) * z;
 
 				// for each vertex attribute
 				for (int j = 0; j < v0.Size(); ++j)
@@ -312,7 +411,7 @@ private:
 					const GenericValue& a1 = v1.varyings[j];
 					const GenericValue& a2 = v2.varyings[j];
 
-					GenericValue interp = InterpolateAttrib(a0, a1, a2, alpha, beta, gamma);
+					GenericValue interp = Interpolate(a0, a1, a2, alpha, beta, gamma, z);
 					interpolated.varyings[j] = interp;
 				}
 
@@ -331,27 +430,16 @@ private:
 		v.z *= v.w;
 		return v;
 	}
-	GenericValue InterpolateAttrib(const GenericValue& a0, const GenericValue& a1, const GenericValue& a2, float alpha, float beta, float gamma)
-	{
-		size_t cnt = a0.count;
-
-		GenericValue result = {0};
-		result.count = cnt;
-
-		for (size_t i = 0; i < cnt; ++i)
-		{
-			result.vals[i] += a0.vals[i] * alpha + a1.vals[i] * beta + a2.vals[i] * gamma;
-		}
-		return result;
-	}
 private:
 	rnd::framebuffer& _fb;
 
 	const VertexBuffer* boundBuffer = nullptr;
+	const IndexBuffer* boundIndexBuffer = nullptr;
+
 	const ShaderProgram* program = nullptr;
-	//std::function<VSOutput(const VsInput&)> vertexShader;
-	//std::function<math::vec4(const VSOutput&)> fragmentShader;
+
 	std::vector<VertexBuffer> vertexBuffers;
+	std::vector<IndexBuffer> indexBuffers;
 
 	viewport _viewport = { 0, 0, 800, 600 };
 

@@ -19,7 +19,11 @@ namespace gfx
 		rnd::color* result = reinterpret_cast<rnd::color*>(stbi_load(file_path.data(), &width, &height, &channels, 4));
 
 		if (!result)
+		{
+			const char* reason = stbi_failure_reason();
+			LOG("{}", reason);
 			throw new std::runtime_error("Failed to load image: " + std::string(file_path));
+		}
 	
 		surface res(width, height);
 
