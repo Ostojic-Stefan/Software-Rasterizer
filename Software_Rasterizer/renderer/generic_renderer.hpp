@@ -44,14 +44,32 @@ struct Renderer
 
 	void BindIndexBuffer(rnd::resource_handle bufferId)
 	{
-		// TODO: add state for no bound buffer. (e.g. -1)
 		boundIndexBuffer = index_buffer_manager.get_ptr(bufferId);
 	}
 
 	void BindVertexBuffer(rnd::resource_handle bufferId)
 	{
-		// TODO: add state for no bound buffer. (e.g. -1)
 		boundBuffer = vertex_buffer_manager.get_ptr(bufferId);
+	}
+
+	void DestroyVertexBuffer(rnd::resource_handle bufferId)
+	{
+		vertex_buffer_manager.free(bufferId);
+	}
+
+	void DestroyIndexBuffer(rnd::resource_handle bufferId)
+	{
+		index_buffer_manager.free(bufferId);
+	}
+
+	void UnbindVertexBuffer(rnd::resource_handle bufferId)
+	{
+		boundBuffer = nullptr;
+	}
+
+	void UnbindIndexBuffer(rnd::resource_handle bufferId)
+	{
+		boundIndexBuffer = nullptr;
 	}
 
 	void SetVertexAttribute(VertexAttrib attrib)

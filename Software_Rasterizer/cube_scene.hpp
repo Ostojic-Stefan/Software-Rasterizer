@@ -14,7 +14,10 @@ struct BasicShaderProgram
 	struct VertexShader
 	{
 		VSOutput operator()(const VSInput& in) const;
+
+		void bindViewMatrix(const math::mat4& view);
 	public:
+		math::mat4 _view;
 		math::mat4 _projection = math::mat4::perspective(0.1f, 100.f, math::pi32/2.f, 800.f / 600.f);
 		rnd::f32 total_time = 0.f;
 	};
@@ -49,10 +52,8 @@ private:
 
 	gfx::mesh cube_mesh;
 
-	//rnd::orbit_camera _camera;
-	//rnd::orbit_camera_controller _cam_ctrl;
+	rnd::orbit_camera _camera;
+	rnd::orbit_camera_controller _cam_ctrl;
 
 	//math::mat4 _projection = math::mat4::perspective(0.1f, 100.f, math::pi32 / 2.f, 800.f / 600.f);
-
-	// gfx::mesh _cube_mesh;
 };

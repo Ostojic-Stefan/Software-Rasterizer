@@ -88,13 +88,13 @@ static inline std::vector<Vertex> BuildVertexDataFromMesh(const gfx::mesh& mesh)
 cube_plain_scene::cube_plain_scene(rnd::framebuffer& fb)
 	:
 	_fb(fb),
-	_generic_renderer(fb)
-
+	_generic_renderer(fb),
+	_camera(3.f),
+	_cam_ctrl(_camera)
 {
 	_generic_renderer.SetViewport({ 0, 0 }, { 800, 600 });
 
 	vboId = _generic_renderer.CreateVertexBuffer(cubeVertices.data(), sizeof(Vertex));
-	//vboId = _generic_renderer.CreateVertexBuffer(vertexData.data(), sizeof(Vertex));
 
 	_generic_renderer.BindVertexBuffer(vboId);
 	_generic_renderer.SetVertexAttribute({ AttribType::Float, 3, offsetof(Vertex, pos), 0 });
@@ -102,7 +102,6 @@ cube_plain_scene::cube_plain_scene(rnd::framebuffer& fb)
 	_generic_renderer.SetVertexAttribute({ AttribType::Float, 2, offsetof(Vertex, tc), 2 });
 
 	iboId = _generic_renderer.CreateIndexBuffer(cubeIndices.data(), cubeIndices.size());
-	//iboId = _generic_renderer.CreateIndexBuffer(indices.data(), indices.size());
 
 	_generic_renderer.BindIndexBuffer(iboId);
 }
@@ -110,6 +109,9 @@ cube_plain_scene::cube_plain_scene(rnd::framebuffer& fb)
 void cube_plain_scene::update(rnd::f32 dt)
 {
 	LOG("{}", 1.f / dt);
+
+	_cam_ctrl.update(dt);
+	_shader_program.vs.bindViewMatrix(_camera.get_view_matrix());
 }
 
 void cube_plain_scene::render()
@@ -120,13 +122,11 @@ void cube_plain_scene::render()
 	_shader_program.vs.total_time = total_time;
 	_generic_renderer.BindShaderProgram(&_shader_program);
 
-	//_generic_renderer.Draw(vertexData.size());
-	//_generic_renderer.DrawIndexed(cube_mesh.indices.size());
 	_generic_renderer.DrawIndexed(cubeIndices.size());
 }
 
 /////////////////////////
-// SHADER
+// SHADERS
 /////////////////////////
 
 VSOutput BasicShaderProgram::VertexShader::operator()(const VSInput& in) const
@@ -136,17 +136,18 @@ VSOutput BasicShaderProgram::VertexShader::operator()(const VSInput& in) const
 	math::vec2 tc = in.Get<math::vec2>(2);
 	
 	VSOutput out;
-	math::mat4 model =
-		math::mat4::translate({ 0.f, 0.f, -2.f }) *
-		math::mat4::rotation_y(total_time) *
-		math::mat4::rotation_x(total_time) *
-		math::mat4::rotation_z(total_time);
+	math::mat4 model = math::mat4::identity();
 
-	out.Position = _projection * model * math::vec4{ pos, 1.0f };
+	out.Position = _projection * _view * model * math::vec4{ pos, 1.0f };
 	out.setVarying<math::vec3>(0, color);
 	out.setVarying<math::vec2>(1, tc);
 	
 	return out;
+}
+
+void BasicShaderProgram::VertexShader::bindViewMatrix(const math::mat4& view)
+{
+	_view = view;
 }
 
 BasicShaderProgram::FragmentShader::FragmentShader()
