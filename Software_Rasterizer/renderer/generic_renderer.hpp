@@ -12,170 +12,9 @@
 
 #include "viewport.hpp"
 #include "generic_value.hpp"
-
-
-enum class AttribType { Float };
-struct VertexAttrib
-{
-	AttribType type;
-	size_t elementCount;
-	rnd::u32 offset;
-	size_t slot;
-};
-
-struct VertexBuffer
-{
-	uint8_t* data;
-	size_t stride;
-
-	std::vector<VertexAttrib> attribs;
-};
-
-struct IndexBuffer
-{
-	const uint16_t* data;
-	uint32_t count;
-};
-
-static inline GenericValue ExtractValue(const uint8_t* ptr, const VertexAttrib& attribute)
-{
-	GenericValue result = {};
-	result.count = attribute.elementCount;
-	if (attribute.type == AttribType::Float)
-	{
-		memcpy(result.vals, ptr, attribute.elementCount * sizeof(float));
-	}
-	else
-	{
-		assert("attrib type not yet implemented");
-	}
-	return result;
-}
-
-struct VsInput
-{
-	void Set(size_t slot, GenericValue value)
-	{
-		assert(slot < MAX_ATTRIBS);
-		attribs[slot] = value;
-	}
-
-	template <typename T>
-	T Get(size_t slot) const;
-
-private:
-	static constexpr size_t MAX_ATTRIBS = 16;
-	std::array<GenericValue, MAX_ATTRIBS> attribs;
-};
-
-template <>
-inline math::vec2 VsInput::Get<math::vec2>(size_t slot) const
-{
-	assert(slot < MAX_ATTRIBS);
-	GenericValue attrib = attribs[slot];
-	assert(attrib.count == 2);
-
-	return { attrib.vals[0], attrib.vals[1] };
-}
-
-template <>
-inline math::vec3 VsInput::Get<math::vec3>(size_t slot) const
-{
-	assert(slot < MAX_ATTRIBS);
-	GenericValue attrib = attribs[slot];
-	assert(attrib.count == 3);
-
-	return { attrib.vals[0], attrib.vals[1], attrib.vals[2] };
-}
-
-template <>
-inline math::vec4 VsInput::Get<math::vec4>(size_t slot) const
-{
-	assert(slot < MAX_ATTRIBS);
-	GenericValue attrib = attribs[slot];
-	assert(attrib.count == 4);
-
-	return { attrib.vals[0], attrib.vals[1], attrib.vals[2], attrib.vals[3] };
-}
-
-struct VSOutput
-{
-	template <typename V>
-	void setVarying(uint32_t location, V var)
-	{
-		assert(location < MAX_VARYINGS);
-
-		if constexpr (std::is_same_v<V, math::vec2>)
-		{
-			GenericValue val = {};
-			val.count = 2;
-			memcpy(val.vals, &var, sizeof(V));
-			varyings[location] = val;
-		}
-		else if constexpr (std::is_same_v<V, math::vec3>)
-		{
-			GenericValue val = {};
-			val.count = 3;
-			memcpy(val.vals, &var, sizeof(V));
-			varyings[location] = val;
-		}
-		else
-		{
-			assert(false && "Not implemented yet");
-		}
-
-		used += 1;
-	}
-
-	// TODO: not the best solution
-	const size_t Size() const
-	{
-		return (size_t)used;
-	}
-
-	template <typename T>
-	T getVarying(uint32_t loc) const;
-
-	math::vec4 Position = {};
-
-//private:
-	int used = 0;
-	static constexpr size_t MAX_VARYINGS = 8;
-	std::array<GenericValue, MAX_VARYINGS> varyings = {0};
-};
-
-template <>
-inline math::vec2 VSOutput::getVarying(uint32_t loc) const
-{
-	assert(loc < MAX_VARYINGS);
-	const GenericValue& val = varyings[loc];
-	assert(val.count == 2);
-	math::vec2 result;
-	memcpy(&result, val.vals, sizeof(float) * val.count);
-	return result;
-}
-
-template <>
-inline math::vec3 VSOutput::getVarying(uint32_t loc) const
-{
-	assert(loc < MAX_VARYINGS);
-	const GenericValue& val = varyings[loc];
-	assert(val.count == 3);
-	math::vec3 result;
-	memcpy(&result, val.vals, sizeof(float) * val.count);
-	return result;
-}
-
-template <>
-inline math::vec4 VSOutput::getVarying(uint32_t loc) const
-{
-	assert(loc < MAX_VARYINGS);
-	const GenericValue& val = varyings[loc];
-	assert(val.count == 4);
-	math::vec4 result;
-	memcpy(&result, val.vals, sizeof(float) * val.count);
-	return result;
-}
+#include "buffers.hpp"
+#include "varying.hpp"
+#include "handle_manager.hpp"
 
 template <typename ShaderProgram>
 struct Renderer
@@ -191,41 +30,39 @@ struct Renderer
 		this->program = program;
 	}
 
-	int CreateVertexBuffer(const void* data, size_t stride)
+	rnd::resource_handle CreateVertexBuffer(const void* data, size_t stride)
 	{
-		VertexBuffer vbo = { (uint8_t*)data, stride };
-
-		vertexBuffers.push_back(vbo);
-
-		// TODO: ehh?
-		return vertexBuffers.size() - 1;
+		rnd::resource_handle vbo_handle = vertex_buffer_manager.emplace((const rnd::u8*)data, stride);
+		return vbo_handle;
 	}
 
-	int CreateIndexBuffer(const uint16_t* data, size_t cnt)
+	rnd::resource_handle CreateIndexBuffer(const uint16_t* data, size_t cnt)
 	{
-		IndexBuffer ibo = { data, cnt };
-		indexBuffers.push_back(ibo);
-		return indexBuffers.size() - 1;
+		rnd::resource_handle ibo_handle = index_buffer_manager.emplace(data, cnt);
+		return ibo_handle;
 	}
 
-	void BindIndexBuffer(int bufferId)
+	void BindIndexBuffer(rnd::resource_handle bufferId)
 	{
 		// TODO: add state for no bound buffer. (e.g. -1)
-		assert(bufferId < indexBuffers.size());
-		boundIndexBuffer = &indexBuffers[bufferId];
+		boundIndexBuffer = index_buffer_manager.get_ptr(bufferId);
 	}
 
-	void BindVertexBuffer(int bufferId)
+	void BindVertexBuffer(rnd::resource_handle bufferId)
 	{
 		// TODO: add state for no bound buffer. (e.g. -1)
-		assert(bufferId < vertexBuffers.size());
-		boundBuffer = &vertexBuffers[bufferId];
+		boundBuffer = vertex_buffer_manager.get_ptr(bufferId);
 	}
 
-	void SetVertexAttribute(int bufferId, VertexAttrib attrib)
+	void SetVertexAttribute(VertexAttrib attrib)
 	{
-		VertexBuffer& vbo = vertexBuffers[bufferId];
-		vbo.attribs.push_back(attrib);
+		assert(boundBuffer);
+		boundBuffer->add_attrib(attrib);
+	}
+
+	void SetViewport(math::vec2i start, math::vec2i end)
+	{
+		_viewport = { start.x, start.y, end.x, end.y };
 	}
 
 	void DrawIndexed(size_t num_indices)
@@ -233,31 +70,29 @@ struct Renderer
 		assert(boundBuffer);
 		assert(boundIndexBuffer);
 
-		const std::vector<VertexAttrib>& attributes = boundBuffer->attribs;
-
 		size_t nTriangles = num_indices / 3;
 
 		// for each triangle
 		for (int i = 0; i < nTriangles; ++i)
 		{
-			VsInput input0{};
-			VsInput input1{};
-			VsInput input2{};
+			VSInput input0{};
+			VSInput input1{};
+			VSInput input2{};
 
-			int idx0 = boundIndexBuffer->data[i * 3 + 0];
-			int idx1 = boundIndexBuffer->data[i * 3 + 1];
-			int idx2 = boundIndexBuffer->data[i * 3 + 2];
+			rnd::u16 idx0 = boundIndexBuffer->data[i * 3 + 0];
+			rnd::u16 idx1 = boundIndexBuffer->data[i * 3 + 1];
+			rnd::u16 idx2 = boundIndexBuffer->data[i * 3 + 2];
 
 			// for each attribute in the vertex
-			for (const VertexAttrib& a : attributes)
+			for (const VertexAttrib& a : boundBuffer->get_attribs())
 			{
-				uint8_t* ptr0 = boundBuffer->data + boundBuffer->stride * idx0 + a.offset;
-				uint8_t* ptr1 = boundBuffer->data + boundBuffer->stride * idx1 + a.offset;
-				uint8_t* ptr2 = boundBuffer->data + boundBuffer->stride * idx2 + a.offset;
-				
-				GenericValue val0 = ExtractValue(ptr0, a);
-				GenericValue val1 = ExtractValue(ptr1, a);
-				GenericValue val2 = ExtractValue(ptr2, a);
+				const uint8_t* ptr0 = boundBuffer->get_data() + boundBuffer->get_stride() * idx0 + a.offset;
+				const uint8_t* ptr1 = boundBuffer->get_data() + boundBuffer->get_stride() * idx1 + a.offset;
+				const uint8_t* ptr2 = boundBuffer->get_data() + boundBuffer->get_stride() * idx2 + a.offset;
+
+				GenericValue val0 = extract_vertex_attribute(ptr0, a);
+				GenericValue val1 = extract_vertex_attribute(ptr1, a);
+				GenericValue val2 = extract_vertex_attribute(ptr2, a);
 
 				input0.Set(a.slot, val0);
 				input1.Set(a.slot, val1);
@@ -313,16 +148,16 @@ struct Renderer
 	void Draw(size_t num_vertices)
 	{
 		assert(boundBuffer);
-		const std::vector<VertexAttrib>& attributes = boundBuffer->attribs;
+		const std::vector<VertexAttrib>& attributes = boundBuffer->get_attribs();
 
 		size_t nTriangles = num_vertices / 3;
 
 		// for each triangle
 		for (int i = 0; i < nTriangles; ++i)
 		{
-			VsInput input0{};
-			VsInput input1{};
-			VsInput input2{};
+			VSInput input0{};
+			VSInput input1{};
+			VSInput input2{};
 
 			// for each attribute in the vertex
 			for (const VertexAttrib& a : attributes)
@@ -433,14 +268,12 @@ private:
 private:
 	rnd::framebuffer& _fb;
 
-	const VertexBuffer* boundBuffer = nullptr;
-	const IndexBuffer* boundIndexBuffer = nullptr;
-
+	VertexBuffer* boundBuffer = nullptr;
+	IndexBuffer* boundIndexBuffer = nullptr;
 	const ShaderProgram* program = nullptr;
 
-	std::vector<VertexBuffer> vertexBuffers;
-	std::vector<IndexBuffer> indexBuffers;
+	rnd::resource_manager<VertexBuffer, 16> vertex_buffer_manager;
+	rnd::resource_manager<IndexBuffer, 16> index_buffer_manager;
 
-	viewport _viewport = { 0, 0, 800, 600 };
-
+	viewport _viewport = { 0 };
 };

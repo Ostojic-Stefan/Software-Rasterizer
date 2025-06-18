@@ -29,7 +29,7 @@
     <ClInclude Include="application.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="viewport.hpp">
+    <ClInclude Include="renderer\viewport.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="renderer.hpp">
@@ -41,7 +41,7 @@
     <ClInclude Include="movement_camera.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="light.hpp">
+    <ClInclude Include="renderer\light.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="another_renderer.hpp">
@@ -56,10 +56,16 @@
     <ClInclude Include="the_renderer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="generic_renderer.hpp">
+    <ClInclude Include="renderer\generic_renderer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="generic_value.hpp">
+    <ClInclude Include="renderer\generic_value.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="renderer\buffers.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="renderer\varying.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

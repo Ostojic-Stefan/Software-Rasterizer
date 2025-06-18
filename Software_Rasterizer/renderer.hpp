@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Engine/engine.hpp>
-#include "viewport.hpp"
-#include "light.hpp"
+#include "renderer/viewport.hpp"
+#include "renderer/light.hpp"
 
 struct vertex_input
 {

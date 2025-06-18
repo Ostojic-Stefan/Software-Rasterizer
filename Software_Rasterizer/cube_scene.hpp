@@ -3,8 +3,8 @@
 #include "scene.hpp"
 #include "orbit_camera.hpp"
 #include "event.hpp"
-#include "viewport.hpp"
-#include "generic_renderer.hpp"
+#include "renderer/viewport.hpp"
+#include "renderer/generic_renderer.hpp"
 #include <graphics/texture.hpp>
 
 #include "graphics/mesh.hpp"
@@ -13,7 +13,7 @@ struct BasicShaderProgram
 {
 	struct VertexShader
 	{
-		VSOutput operator()(const VsInput& in) const;
+		VSOutput operator()(const VSInput& in) const;
 	public:
 		math::mat4 _projection = math::mat4::perspective(0.1f, 100.f, math::pi32/2.f, 800.f / 600.f);
 		rnd::f32 total_time = 0.f;
@@ -44,8 +44,8 @@ private:
 	BasicShaderProgram _shader_program;
 	Renderer<BasicShaderProgram> _generic_renderer;
 	
-	int vboId;
-	int iboId;
+	rnd::resource_handle vboId;
+	rnd::resource_handle iboId;
 
 	gfx::mesh cube_mesh;
 

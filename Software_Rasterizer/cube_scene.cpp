@@ -91,14 +91,15 @@ cube_plain_scene::cube_plain_scene(rnd::framebuffer& fb)
 	_generic_renderer(fb)
 
 {
+	_generic_renderer.SetViewport({ 0, 0 }, { 800, 600 });
 
 	vboId = _generic_renderer.CreateVertexBuffer(cubeVertices.data(), sizeof(Vertex));
 	//vboId = _generic_renderer.CreateVertexBuffer(vertexData.data(), sizeof(Vertex));
 
 	_generic_renderer.BindVertexBuffer(vboId);
-	_generic_renderer.SetVertexAttribute(vboId, { AttribType::Float, 3, offsetof(Vertex, pos), 0 });
-	_generic_renderer.SetVertexAttribute(vboId, { AttribType::Float, 3, offsetof(Vertex, color), 1 });
-	_generic_renderer.SetVertexAttribute(vboId, { AttribType::Float, 2, offsetof(Vertex, tc), 2 });
+	_generic_renderer.SetVertexAttribute({ AttribType::Float, 3, offsetof(Vertex, pos), 0 });
+	_generic_renderer.SetVertexAttribute({ AttribType::Float, 3, offsetof(Vertex, color), 1 });
+	_generic_renderer.SetVertexAttribute({ AttribType::Float, 2, offsetof(Vertex, tc), 2 });
 
 	iboId = _generic_renderer.CreateIndexBuffer(cubeIndices.data(), cubeIndices.size());
 	//iboId = _generic_renderer.CreateIndexBuffer(indices.data(), indices.size());
@@ -128,23 +129,7 @@ void cube_plain_scene::render()
 // SHADER
 /////////////////////////
 
-BasicShaderProgram::FragmentShader::FragmentShader()
-{
-	//surf = gfx::surface::from_file("../assets/container2.png");
-	surf = gfx::surface::from_file("../assets/checker.jpg");
-}
-
-math::vec4 BasicShaderProgram::FragmentShader::operator()(const VSOutput& vsout) const
-{
-	math::vec3 color = vsout.getVarying<math::vec3>(0);
-	math::vec2 tc = vsout.getVarying<math::vec2>(1);
-	
-	math::vec4 col = surf.sample(tc.x, tc.y) * math::vec4(color, 1.f);
-	//math::vec4 col = surf.sample(tc.x, tc.y);
-	return col;
-}
-
-VSOutput BasicShaderProgram::VertexShader::operator()(const VsInput& in) const
+VSOutput BasicShaderProgram::VertexShader::operator()(const VSInput& in) const
 {
 	math::vec3 pos = in.Get<math::vec3>(0);
 	math::vec3 color = in.Get<math::vec3>(1);
@@ -163,3 +148,20 @@ VSOutput BasicShaderProgram::VertexShader::operator()(const VsInput& in) const
 	
 	return out;
 }
+
+BasicShaderProgram::FragmentShader::FragmentShader()
+{
+	//surf = gfx::surface::from_file("../assets/container2.png");
+	surf = gfx::surface::from_file("../assets/checker.jpg");
+}
+
+math::vec4 BasicShaderProgram::FragmentShader::operator()(const VSOutput& vsout) const
+{
+	math::vec3 color = vsout.getVarying<math::vec3>(0);
+	math::vec2 tc = vsout.getVarying<math::vec2>(1);
+	
+	math::vec4 col = surf.sample(tc.x, tc.y) * math::vec4(color, 1.f);
+	//math::vec4 col = surf.sample(tc.x, tc.y);
+	return col;
+}
+
