@@ -26,12 +26,13 @@ struct model_shader_program
 	{
 		fragment_shader();
 		void bind_point_light(const point_light& p_light);
+		void bind_view_direction(const math::vec3& view_dir);
 
 		math::vec4 operator()(const VSOutput& vsout) const;
 
 	public:
 		gfx::surface surf;
-
+		math::vec3 cam_pos;
 		point_light p_light;
 	};
 

@@ -74,9 +74,6 @@
     <ClInclude Include="model_scene.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="assimp_model.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="renderer\model.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

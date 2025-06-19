@@ -165,7 +165,6 @@
   <ItemGroup>
     <ClInclude Include="another_renderer.hpp" />
     <ClInclude Include="application.hpp" />
-    <ClInclude Include="assimp_model.hpp" />
     <ClInclude Include="cube_scene.hpp" />
     <ClInclude Include="model_scene.hpp" />
     <ClInclude Include="renderer\generic_renderer.hpp" />
