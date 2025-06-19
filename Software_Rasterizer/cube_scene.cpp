@@ -65,25 +65,25 @@ static const std::vector<uint16_t> cubeIndices = {
 	20, 21, 22,  22, 23, 20,   // -Z
 };
 
-static inline std::vector<Vertex> BuildVertexDataFromMesh(const gfx::mesh& mesh)
-{
-	std::vector<Vertex> result;
-	size_t size = mesh.positions.size();
-
-	result.reserve(size);
-
-	for (int i = 0; i < size; ++i)
-	{
-		Vertex v;
-		v.pos = mesh.positions[i];
-		v.color = mesh.colors[i];
-		v.tc = mesh.tex_coords[i];
-
-		result.push_back(v);
-	}
-
-	return result;
-}
+//static inline std::vector<Vertex> BuildVertexDataFromMesh(const gfx::mesh& mesh)
+//{
+//	std::vector<Vertex> result;
+//	size_t size = mesh.positions.size();
+//
+//	result.reserve(size);
+//
+//	for (int i = 0; i < size; ++i)
+//	{
+//		Vertex v;
+//		v.pos = mesh.positions[i];
+//		v.color = mesh.colors[i];
+//		v.tc = mesh.tex_coords[i];
+//
+//		result.push_back(v);
+//	}
+//
+//	return result;
+//}
 
 cube_plain_scene::cube_plain_scene(rnd::framebuffer& fb)
 	:

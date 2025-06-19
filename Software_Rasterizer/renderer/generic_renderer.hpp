@@ -36,7 +36,7 @@ struct Renderer
 		return vbo_handle;
 	}
 
-	rnd::resource_handle CreateIndexBuffer(const uint16_t* data, size_t cnt)
+	rnd::resource_handle CreateIndexBuffer(const rnd::u16* data, size_t cnt)
 	{
 		rnd::resource_handle ibo_handle = index_buffer_manager.emplace(data, cnt);
 		return ibo_handle;
@@ -253,6 +253,10 @@ private:
 
 				float oneOverZ = alpha * v0.Position.w + beta * v1.Position.w + gamma * v2.Position.w;
 				float z = 1.f / oneOverZ;
+
+				if (z >= _fb.get_depth(x, y))
+					continue;
+				_fb.set_depth(x, y, z);
 
 				VSOutput interpolated;
 				interpolated.Position = (v0.Position * alpha + v1.Position * beta + v2.Position * gamma) * z;

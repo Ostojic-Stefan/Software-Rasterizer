@@ -7,7 +7,7 @@ struct GenericValue
 		float vals[4];
 		__m128 _v;
 	};
-	int count;
+	size_t count;
 };
 
 static inline GenericValue Interpolate(const GenericValue& a0, const GenericValue& a1, const GenericValue& a2, float alpha, float beta, float gamma, float z)

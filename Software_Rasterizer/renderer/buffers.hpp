@@ -52,6 +52,6 @@ static inline GenericValue extract_vertex_attribute(const uint8_t* ptr, const Ve
 
 struct IndexBuffer
 {
-	const uint16_t* data = nullptr;
-	uint32_t count = 0;
+	const rnd::u16* data = nullptr;
+	rnd::sz count = 0;
 };

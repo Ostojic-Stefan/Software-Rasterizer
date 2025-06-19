@@ -5,7 +5,8 @@
 application::application()
 	:
 	fb(800, 600),
-	_cube_scene(fb)
+	_cube_scene(fb),
+	_model_scene(fb)
 	//renderer(fb)
 {
 	platform::initialize({
@@ -82,9 +83,10 @@ void application::update(rnd::f32 dt)
 	auto pos = rnd::input::get_mouse_pos();
 	// LOG("x = {}, y = {}", pos.x, pos.y);
 
-	//LOG("{}", 1.f / dt);
+	LOG("{}", 1.f / dt);
 	//LOG("{}", camera.get_position().x);
-	_cube_scene.update(dt);
+	//_cube_scene.update(dt);
+	_model_scene.update(dt);
 }
 
 
@@ -92,5 +94,6 @@ void application::render()
 {
 	//fb.clear_color(rnd::dark_gray);
 	//renderer.render_indexed();
-	_cube_scene.render();
+	//_cube_scene.render();
+	_model_scene.render();
 }

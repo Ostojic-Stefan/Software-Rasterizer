@@ -7,6 +7,7 @@
 #include "platform.hpp"
 
 #include "the_renderer.hpp"
+#include "model_scene.hpp"
 
 class application
 {
@@ -27,4 +28,5 @@ private:
 	// the_renderer<shader_program> renderer;
 
 	cube_plain_scene _cube_scene;
+	mode_scene _model_scene;
 };

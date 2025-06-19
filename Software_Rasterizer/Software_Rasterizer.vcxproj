@@ -160,11 +160,14 @@
     <ClCompile Include="application.cpp" />
     <ClCompile Include="cube_scene.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="model_scene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="another_renderer.hpp" />
     <ClInclude Include="application.hpp" />
+    <ClInclude Include="assimp_model.hpp" />
     <ClInclude Include="cube_scene.hpp" />
+    <ClInclude Include="model_scene.hpp" />
     <ClInclude Include="renderer\generic_renderer.hpp" />
     <ClInclude Include="renderer\generic_value.hpp" />
     <ClInclude Include="renderer\light.hpp" />
@@ -172,6 +175,8 @@
     <ClInclude Include="orbit_camera.hpp" />
     <ClInclude Include="renderer.hpp" />
     <ClInclude Include="renderer\buffers.hpp" />
+    <ClInclude Include="renderer\mesh.hpp" />
+    <ClInclude Include="renderer\model.hpp" />
     <ClInclude Include="renderer\varying.hpp" />
     <ClInclude Include="scene.hpp" />
     <ClInclude Include="the_renderer.hpp" />

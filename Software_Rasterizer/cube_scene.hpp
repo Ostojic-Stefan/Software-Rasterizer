@@ -7,8 +7,6 @@
 #include "renderer/generic_renderer.hpp"
 #include <graphics/texture.hpp>
 
-#include "graphics/mesh.hpp"
-
 struct BasicShaderProgram
 {
 	struct VertexShader
@@ -50,10 +48,6 @@ private:
 	rnd::resource_handle vboId;
 	rnd::resource_handle iboId;
 
-	gfx::mesh cube_mesh;
-
 	rnd::orbit_camera _camera;
 	rnd::orbit_camera_controller _cam_ctrl;
-
-	//math::mat4 _projection = math::mat4::perspective(0.1f, 100.f, math::pi32 / 2.f, 800.f / 600.f);
 };
