@@ -3,7 +3,6 @@
 #include "frame_buffer.hpp"
 #include "types.hpp"
 #include "math/point.hpp"
-#include "mesh.hpp"
 
 namespace gfx
 {
@@ -57,18 +56,18 @@ namespace gfx
         draw_line(v2, v0, line_color, fb);
     }
 
-    static inline void draw_mesh_wireframe(const gfx::mesh& mesh, const rnd::color& line_color, rnd::framebuffer& fb)
-    {
-        ASSERT(mesh.indices.size() % 3 == 0, "number of indices should be a multiple of 3");
+    //static inline void draw_mesh_wireframe(const gfx::mesh& mesh, const rnd::color& line_color, rnd::framebuffer& fb)
+    //{
+    //    ASSERT(mesh.indices.size() % 3 == 0, "number of indices should be a multiple of 3");
 
-        rnd::sz triangle_count = mesh.indices.size() / 3;
-        for (rnd::u32 i = 0; i < triangle_count; i++)
-        {
-            const math::vec3& v0 = mesh.positions[mesh.indices[i * 3 + 0]];
-            const math::vec3& v1 = mesh.positions[mesh.indices[i * 3 + 1]];
-            const math::vec3& v2 = mesh.positions[mesh.indices[i * 3 + 2]];
+    //    rnd::sz triangle_count = mesh.indices.size() / 3;
+    //    for (rnd::u32 i = 0; i < triangle_count; i++)
+    //    {
+    //        const math::vec3& v0 = mesh.positions[mesh.indices[i * 3 + 0]];
+    //        const math::vec3& v1 = mesh.positions[mesh.indices[i * 3 + 1]];
+    //        const math::vec3& v2 = mesh.positions[mesh.indices[i * 3 + 2]];
 
-            gfx::draw_triangle_outline({ v0, v1, v2 }, line_color, fb);
-        }
-    }
+    //        gfx::draw_triangle_outline({ v0, v1, v2 }, line_color, fb);
+    //    }
+    //}
 }

@@ -5,6 +5,8 @@
 #include "types.hpp"
 #include <cassert>
 #include <immintrin.h>
+#include <print>
+#include "core.hpp"
 
 namespace math
 {

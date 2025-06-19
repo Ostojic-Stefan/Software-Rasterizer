@@ -51,9 +51,6 @@
     <ClInclude Include="src\Engine\graphics\graphics.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\graphics\mesh.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\math\matrix.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
