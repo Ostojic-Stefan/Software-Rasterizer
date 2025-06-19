@@ -164,6 +164,8 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\Engine\concurrency\ts_ring_buffer.hpp" />
+    <ClInclude Include="src\Engine\concurrency\worker_pool.hpp" />
     <ClInclude Include="src\Engine\graphics\graphics.hpp" />
     <ClInclude Include="src\Engine\graphics\texture.hpp" />
     <ClInclude Include="src\Engine\handle_manager.hpp" />
