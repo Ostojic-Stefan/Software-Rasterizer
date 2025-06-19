@@ -1,15 +1,5 @@
 #include "model_scene.hpp"
 
-//struct vertex
-//{
-//	math::vec3 pos;
-//	math::vec3 normal;
-//	math::vec2 tc;
-//};
-//
-//static std::vector<vertex> vertices;
-//static std::vector<rnd::u16> indices;
-
 mode_scene::mode_scene(rnd::framebuffer& fb)
 	:
 	_fb(fb),
@@ -20,6 +10,9 @@ mode_scene::mode_scene(rnd::framebuffer& fb)
 {
 	_generic_renderer.SetViewport({ 0, 0 }, { 800, 600 });
 	_generic_renderer.BindShaderProgram(&_shader_program);
+
+	_point_light.position = {0.f, 0.f, 10.f};
+	_point_light.color = {1.f, 1.f, 1.f, 1.f};
 
 	for (gfx::mesh& mesh : the_model.meshes)
 	{
@@ -35,24 +28,19 @@ mode_scene::mode_scene(rnd::framebuffer& fb)
 		mesh.iboid = _generic_renderer.CreateIndexBuffer(mesh.indices.data(), mesh.indices.size());
 		_generic_renderer.BindIndexBuffer(mesh.iboid);
 	}
-
-	//auto vboId = _generic_renderer.CreateVertexBuffer(vertices.data(), sizeof(vertex));
-	//_generic_renderer.BindVertexBuffer(vboId);
-
-	//_generic_renderer.SetVertexAttribute({ AttribType::Float, 3, offsetof(vertex, pos), 0 });
-	//_generic_renderer.SetVertexAttribute({ AttribType::Float, 3, offsetof(vertex, normal), 1 });
-	//_generic_renderer.SetVertexAttribute({ AttribType::Float, 2, offsetof(vertex, tc), 2});
-
-	//auto iboId = _generic_renderer.CreateIndexBuffer(indices.data(), indices.size());
-	//_generic_renderer.BindIndexBuffer(iboId);
-
-	//_generic_renderer.SetViewport({ 0, 0 }, { 800, 600 });
-	//_generic_renderer.BindShaderProgram(&_shader_program);
 }
+
+static rnd::f32 total_time = 0.f;
 
 void mode_scene::update(rnd::f32 dt)
 {
+	total_time += dt;
 	_cam_ctrl.update(dt);
+
+	static constexpr float light_dist = 15.f;
+	_point_light.position = {light_dist * std::cos(total_time), 0.f, light_dist * std::sin(total_time) };
+
+	//_shader_program.vs.total_time += dt;
 }
 
 void mode_scene::render()
@@ -60,6 +48,7 @@ void mode_scene::render()
 	_fb.clear_color(rnd::dark_gray);
 	_fb.clear_depth();
 	_shader_program.vs.bindViewMatrix(_camera.get_view_matrix());
+	_shader_program.fs.bind_point_light(_point_light);
 
 	for (gfx::mesh& mesh : the_model.meshes)
 	{
@@ -68,8 +57,6 @@ void mode_scene::render()
 
 		_generic_renderer.DrawIndexed(mesh.indices.size());
 	}
-
-	//_generic_renderer.DrawIndexed(indices.size());
 }
 
 ////////// SHADERS //////////
@@ -81,12 +68,13 @@ VSOutput model_shader_program::vertex_shader::operator()(const VSInput& in) cons
 	math::vec2 tc = in.Get<math::vec2>(2);
 
 	VSOutput out;
-	math::mat4 model = math::mat4::identity() * math::mat4::scale(1.5f);
+	math::mat4 model = math::mat4::translate({ 0.f, 0.f, total_time }) * math::mat4::scale(1.5f);
 	out.Position = _projection * _view * model * math::vec4{ pos, 1.0f };
 	normal = model * normal;
 
-	out.setVarying<math::vec3>(0, normal);
-	out.setVarying<math::vec2>(1, tc);
+	out.setVarying<math::vec3>(0, pos);
+	out.setVarying<math::vec3>(1, normal);
+	out.setVarying<math::vec2>(2, tc);
 
 	return out;
 }
@@ -101,14 +89,25 @@ model_shader_program::fragment_shader::fragment_shader()
 	surf = gfx::surface::from_file("../assets/checker.jpg");
 }
 
-math::vec4 model_shader_program::fragment_shader::operator()(const VSOutput& vsout) const
+void model_shader_program::fragment_shader::bind_point_light(const point_light& p_light)
 {
-	math::vec3 normal = vsout.getVarying<math::vec3>(0);
-	math::vec2 tc = vsout.getVarying<math::vec2>(1);
-
-	//math::vec4 col = surf.sample(tc.x, tc.y);
-	math::vec4 col(normal, 1.f);
-	return col;
+	this->p_light = p_light;
 }
 
+math::vec4 model_shader_program::fragment_shader::operator()(const VSOutput& vsout) const
+{
+	math::vec3 frag_pos = vsout.getVarying<math::vec3>(0);
+	math::vec3 normal = vsout.getVarying<math::vec3>(1);
+	math::vec2 tc = vsout.getVarying<math::vec2>(2);
+
+	math::vec3 obj_color(1.f);
+	math::vec3 light_dir = p_light.position - frag_pos;
+
+	rnd::f32 diff = math::dot(normal, light_dir);
+
+	math::vec3 final_color = obj_color * diff * 0.1f;
+
+	math::vec4 col = { final_color, 1.f };
+	return col;
+}
 

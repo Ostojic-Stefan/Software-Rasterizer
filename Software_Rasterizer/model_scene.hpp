@@ -7,6 +7,7 @@
 #include "renderer/generic_renderer.hpp"
 #include <graphics/texture.hpp>
 #include "renderer/model.hpp"
+#include "renderer/light.hpp"
 
 struct model_shader_program
 {
@@ -24,10 +25,14 @@ struct model_shader_program
 	struct fragment_shader
 	{
 		fragment_shader();
+		void bind_point_light(const point_light& p_light);
+
 		math::vec4 operator()(const VSOutput& vsout) const;
 
 	public:
 		gfx::surface surf;
+
+		point_light p_light;
 	};
 
 	vertex_shader vs;
@@ -53,4 +58,5 @@ private:
 	rnd::orbit_camera_controller _cam_ctrl;
 
 	gfx::model the_model;
+	point_light _point_light;
 };
