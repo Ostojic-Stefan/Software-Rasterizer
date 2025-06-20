@@ -16,13 +16,27 @@
 #include "varying.hpp"
 #include "handle_manager.hpp"
 
+struct Triangle 
+{
+	VSOutput v0, v1, v2;
+	rnd::f32 area;
+};
+
 template <typename ShaderProgram>
 struct Renderer
 {
+	static constexpr size_t MAX_TRIS = 5'000;
+
 	Renderer(rnd::framebuffer& fb)
 		:
 		_fb(fb)
 	{
+		binData = (int*)std::malloc(NUM_TX * NUM_TY * MAX_TRI_PER_TILE * sizeof(int));
+		binCount = (int*)std::calloc(NUM_TX * NUM_TY, sizeof(int));
+
+		// TODO: maybe not...
+		triangles = (Triangle*)std::malloc(MAX_TRIS * sizeof(Triangle));
+		usedTriangles = 0;
 	}
 
 	void BindShaderProgram(const ShaderProgram* program)
@@ -81,6 +95,98 @@ struct Renderer
 	void SetViewport(math::vec2i start, math::vec2i end)
 	{
 		_viewport = { start.x, start.y, end.x, end.y };
+	}
+
+	void DrawIndexedBin(size_t num_indices)
+	{
+		assert(boundBuffer);
+		assert(boundIndexBuffer);
+		usedTriangles = 0;
+
+		size_t nTriangles = num_indices / 3;
+
+		// for each triangle
+		for (int i = 0; i < nTriangles; ++i)
+		{
+			VSInput input0{};
+			VSInput input1{};
+			VSInput input2{};
+
+			rnd::u16 idx0 = boundIndexBuffer->data[i * 3 + 0];
+			rnd::u16 idx1 = boundIndexBuffer->data[i * 3 + 1];
+			rnd::u16 idx2 = boundIndexBuffer->data[i * 3 + 2];
+
+			// for each attribute in the vertex
+			for (const VertexAttrib& a : boundBuffer->get_attribs())
+			{
+				const uint8_t* ptr0 = boundBuffer->get_data() + boundBuffer->get_stride() * idx0 + a.offset;
+				const uint8_t* ptr1 = boundBuffer->get_data() + boundBuffer->get_stride() * idx1 + a.offset;
+				const uint8_t* ptr2 = boundBuffer->get_data() + boundBuffer->get_stride() * idx2 + a.offset;
+
+				GenericValue val0 = extract_vertex_attribute(ptr0, a);
+				GenericValue val1 = extract_vertex_attribute(ptr1, a);
+				GenericValue val2 = extract_vertex_attribute(ptr2, a);
+
+				input0.Set(a.slot, val0);
+				input1.Set(a.slot, val1);
+				input2.Set(a.slot, val2);
+			}
+			VSOutput vsout[3];
+
+			// vertex shader
+			vsout[0] = program->vs(input0);
+			vsout[1] = program->vs(input1);
+			vsout[2] = program->vs(input2);
+
+			// perspective division and viewport trasnform
+			vsout[0].Position = _viewport.transform(perspective_divide(vsout[0].Position));
+			vsout[1].Position = _viewport.transform(perspective_divide(vsout[1].Position));
+			vsout[2].Position = _viewport.transform(perspective_divide(vsout[2].Position));
+
+			// perspective correction
+			std::size_t sz = vsout->Size();
+			for (int j = 0; j < sz; ++j)
+			{
+				GenericValue& gv0 = vsout[0].varyings[j];
+				GenericValue& gv1 = vsout[1].varyings[j];
+				GenericValue& gv2 = vsout[2].varyings[j];
+
+				const std::size_t sz = gv0.count;
+				for (int j = 0; j < sz; ++j)
+				{
+					gv0.vals[j] = gv0.vals[j] * vsout[0].Position.w;
+					gv1.vals[j] = gv1.vals[j] * vsout[1].Position.w;
+					gv2.vals[j] = gv2.vals[j] * vsout[2].Position.w;
+				}
+			}
+
+			rnd::f32 area = math::det_2d(
+				vsout[1].Position - vsout[0].Position,
+				vsout[2].Position - vsout[0].Position
+			);
+
+			// backface culling
+			const rnd::b8 ccw = area < 0.f;
+			if (!ccw)
+				continue;
+			std::swap(vsout[1], vsout[2]);
+			area = -area;
+
+			triangles[usedTriangles++] = Triangle{ vsout[0], vsout[1], vsout[2], area };
+		}
+
+		// setup triangles for tiled rendering
+		setupTriangles();
+
+		// rasterize tiles
+		for (int ty = 0; ty < NUM_TY; ++ty)
+		{
+			for (int tx = 0; tx < NUM_TX; ++tx)
+			{
+				if (binCount[ty * NUM_TX + tx] > 0)
+					rasterizeTile(tx, ty);
+			}
+		}
 	}
 
 	void DrawIndexed(size_t num_indices)
@@ -158,7 +264,8 @@ struct Renderer
 			std::swap(vsout[1], vsout[2]);
 			area = -area;
 
-			draw_triangle_basic(vsout[0], vsout[1], vsout[2], area);
+			//draw_triangle_basic(vsout[0], vsout[1], vsout[2], area);
+			draw_triangle_basic_test(vsout[0], vsout[1], vsout[2], area);
 		}
 
 	}
@@ -219,6 +326,38 @@ struct Renderer
 	}
 
 private:
+	void draw_triangle_basic_test(VSOutput& v0, VSOutput& v1, VSOutput& v2, rnd::f32 area)
+	{
+		rnd::f32 rcp_area = 1.f / area;
+
+		rnd::i32 xmin = (rnd::i32)util::min3(v0.Position.x, v1.Position.x, v2.Position.x);
+		rnd::i32 xmax = (rnd::i32)util::max3(v0.Position.x, v1.Position.x, v2.Position.x);
+		rnd::i32 ymin = (rnd::i32)util::min3(v0.Position.y, v1.Position.y, v2.Position.y);
+		rnd::i32 ymax = (rnd::i32)util::max3(v0.Position.y, v1.Position.y, v2.Position.y);
+
+		// Clamp to viewport bounds.
+		xmin = std::clamp(xmin, _viewport.xmin, _viewport.xmax - 1);
+		xmax = std::clamp(xmax, _viewport.xmin, _viewport.xmax - 1);
+		ymin = std::clamp(ymin, _viewport.ymin, _viewport.ymax - 1);
+		ymax = std::clamp(ymax, _viewport.ymin, _viewport.ymax - 1);
+
+		for (rnd::i32 y = ymin; y <= ymax; ++y)
+		{
+			for (rnd::i32 x = xmin; x <= xmax; ++x)
+			{
+				math::vec4 p{ x + 0.5f, y + 0.5f, 0.f, 0.f };
+
+				float det01p = math::det_2d(v1.Position - v0.Position, p - v0.Position);
+				float det12p = math::det_2d(v2.Position - v1.Position, p - v1.Position);
+				float det20p = math::det_2d(v0.Position - v2.Position, p - v2.Position);
+
+				if (det01p < 0.f || det12p < 0.f || det20p < 0.f)
+					continue;
+
+				_fb.put_pixel((int)x, (int)y, rnd::green);
+			}
+		}
+	}
 	void draw_triangle_basic(VSOutput& v0, VSOutput& v1, VSOutput& v2, rnd::f32 area)
 	{
 		rnd::f32 rcp_area = 1.f / area;
@@ -278,7 +417,6 @@ private:
 			}
 		}
 	}
-private:
 	inline static math::vec4 perspective_divide(math::vec4 v)
 	{
 		v.w = 1.f / v.w;
@@ -286,6 +424,84 @@ private:
 		v.y *= v.w;
 		v.z *= v.w;
 		return v;
+	}
+private:
+	// binning
+	void rasterizeTile(int tx, int ty)
+	{
+		int idx = ty * NUM_TX + tx;
+
+		for (int bi = 0; bi < binCount[idx]; ++bi) 
+		{
+			const Triangle& t = triangles[binData[idx * MAX_TRI_PER_TILE + bi]];
+			int startX = tx * TILE_W;
+			int startY = ty * TILE_H;
+			int endX = startX + TILE_W;
+			int endY = startY + TILE_H;
+
+			// calculate the god damn triangle's bounding box here jesus christ.
+			rnd::i32 xmin = (rnd::i32)util::min3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+			rnd::i32 xmax = (rnd::i32)util::max3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+			rnd::i32 ymin = (rnd::i32)util::min3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+			rnd::i32 ymax = (rnd::i32)util::max3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+
+			// Clamp to viewport bounds.
+			xmin = std::clamp(xmin, startX, endX);
+			xmax = std::clamp(xmax, startX, endX);
+			ymin = std::clamp(ymin, startY, endY);
+			ymax = std::clamp(ymax, startY, endY);
+
+			for (int y = ymin; y <= ymax; ++y)
+			{
+				for (int x = xmin; x <= xmax; ++x)
+				{
+					math::vec4 p{ x + 0.5f, y + 0.5f, 0.f, 0.f };
+
+					float det01p = math::det_2d(t.v1.Position - t.v0.Position, p - t.v0.Position);
+					float det12p = math::det_2d(t.v2.Position - t.v1.Position, p - t.v1.Position);
+					float det20p = math::det_2d(t.v0.Position - t.v2.Position, p - t.v2.Position);
+
+					if (det01p < 0.f || det12p < 0.f || det20p < 0.f)
+						continue;
+
+					_fb.put_pixel((int)x, (int)y, rnd::red);
+				}
+			}
+		}
+	}
+
+	void setupTriangles()
+	{
+		//memset(binData, 0, NUM_TX * NUM_TY * MAX_TRI_PER_TILE * sizeof(int));
+		memset(binCount, 0, NUM_TX * NUM_TY * sizeof(int));
+
+		// bin each triangle by it's bounding box
+		for (int ti = 0; ti < (int)usedTriangles; ++ti)
+		{
+			Triangle& t = triangles[ti];
+			// bbox
+			int minX = std::floor(std::min({ t.v0.Position.x, t.v1.Position.x, t.v2.Position.x }));
+			int maxX = std::ceil(std::max({ t.v0.Position.x, t.v1.Position.x, t.v2.Position.x }));
+			int minY = std::floor(std::min({ t.v0.Position.y, t.v1.Position.y, t.v2.Position.y }));
+			int maxY = std::ceil(std::max({ t.v0.Position.y, t.v1.Position.y, t.v2.Position.y }));
+
+			// tile bounds
+			int tx0 = std::max(0, minX / TILE_W);
+			int tx1 = std::min(NUM_TX - 1, maxX / TILE_W);
+			int ty0 = std::max(0, minY / TILE_H);
+			int ty1 = std::min(NUM_TY - 1, maxY / TILE_H);
+
+			for (int ty = ty0; ty <= ty1; ++ty)
+			{
+				for (int tx = tx0; tx <= tx1; ++tx)
+				{
+					int idx = ty * NUM_TX + tx;
+					int c = binCount[idx]++;
+					assert(c < MAX_TRI_PER_TILE);
+					binData[idx * MAX_TRI_PER_TILE + c] = ti;	// binData[idx][c] = ti;
+				}
+			}
+		}
 	}
 private:
 	rnd::framebuffer& _fb;
@@ -298,4 +514,19 @@ private:
 	rnd::resource_manager<IndexBuffer, 16> index_buffer_manager;
 
 	viewport _viewport = { 0 };
+
+	// binning
+	static constexpr int W = 800;      
+	static constexpr int H = 600;      
+	static constexpr int TILE_W = 64;	// tile size
+	static constexpr int TILE_H = 128;
+	static constexpr int NUM_TX = (W + TILE_W - 1) / TILE_W;
+	static constexpr int NUM_TY = (H + TILE_H - 1) / TILE_H;
+	static constexpr int MAX_TRI_PER_TILE = 16;
+
+	//std::vector<Triangle> triangles;
+	Triangle* triangles = nullptr;
+	size_t usedTriangles = 0;
+	int* binData = nullptr;		// [NUM_TX * NUM_TY][MAX_TRI_PER_TILE]
+	int* binCount = nullptr;	// [NUM_TX * NUM_TY]
 };

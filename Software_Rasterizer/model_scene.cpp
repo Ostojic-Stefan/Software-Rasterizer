@@ -6,7 +6,7 @@ mode_scene::mode_scene(rnd::framebuffer& fb)
 	_generic_renderer(fb),
 	_camera(10.f),
 	_cam_ctrl(_camera),
-	the_model("../assets/models/nanosuit.obj")
+	the_model("../assets/models/cube.obj")
 {
 	_generic_renderer.SetViewport({ 0, 0 }, { 800, 600 });
 	_generic_renderer.BindShaderProgram(&_shader_program);
@@ -64,8 +64,11 @@ void mode_scene::render()
 		_generic_renderer.BindVertexBuffer(mesh.vboid);
 		_generic_renderer.BindIndexBuffer(mesh.iboid);
 
-		_generic_renderer.DrawIndexed(mesh.indices.size());
+		_generic_renderer.DrawIndexedBin(mesh.indices.size());
+		//_generic_renderer.DrawIndexed(mesh.indices.size());
 	}
+
+	int a = 5;
 }
 
 ////////// SHADERS //////////
