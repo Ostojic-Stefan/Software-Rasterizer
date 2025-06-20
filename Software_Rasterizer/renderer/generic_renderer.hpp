@@ -16,6 +16,8 @@
 #include "varying.hpp"
 #include "handle_manager.hpp"
 
+#include "concurrency/worker_pool.hpp"
+
 struct Triangle 
 {
 	VSOutput v0, v1, v2;
@@ -25,7 +27,7 @@ struct Triangle
 template <typename ShaderProgram>
 struct Renderer
 {
-	static constexpr size_t MAX_TRIS = 5'000;
+	static constexpr size_t MAX_TRIS = 15'000;
 
 	Renderer(rnd::framebuffer& fb)
 		:
@@ -37,6 +39,8 @@ struct Renderer
 		// TODO: maybe not...
 		triangles = (Triangle*)std::malloc(MAX_TRIS * sizeof(Triangle));
 		usedTriangles = 0;
+
+		activeTiles.reserve(NUM_TX * NUM_TY);
 	}
 
 	void BindShaderProgram(const ShaderProgram* program)
@@ -179,13 +183,12 @@ struct Renderer
 		setupTriangles();
 
 		// rasterize tiles
-		for (int ty = 0; ty < NUM_TY; ++ty)
+		for (int idx : activeTiles)
 		{
-			for (int tx = 0; tx < NUM_TX; ++tx)
-			{
-				if (binCount[ty * NUM_TX + tx] > 0)
-					rasterizeTile(tx, ty);
-			}
+			int tx = idx % NUM_TX;
+			int ty = idx / NUM_TX;
+
+			rasterizeTile(tx, ty);
 		}
 	}
 
@@ -434,10 +437,10 @@ private:
 		for (int bi = 0; bi < binCount[idx]; ++bi) 
 		{
 			const Triangle& t = triangles[binData[idx * MAX_TRI_PER_TILE + bi]];
-			int startX = tx * TILE_W;
-			int startY = ty * TILE_H;
-			int endX = startX + TILE_W;
-			int endY = startY + TILE_H;
+			int tileStartX = tx * TILE_W;
+			int tileStartY = ty * TILE_H;
+			int tileEndX = std::min(tileStartX + TILE_W, W);
+			int tileEndY = std::min(tileStartY + TILE_H, H);
 
 			// calculate the god damn triangle's bounding box here jesus christ.
 			rnd::i32 xmin = (rnd::i32)util::min3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
@@ -445,11 +448,11 @@ private:
 			rnd::i32 ymin = (rnd::i32)util::min3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
 			rnd::i32 ymax = (rnd::i32)util::max3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
 
-			// Clamp to viewport bounds.
-			xmin = std::clamp(xmin, startX, endX);
-			xmax = std::clamp(xmax, startX, endX);
-			ymin = std::clamp(ymin, startY, endY);
-			ymax = std::clamp(ymax, startY, endY);
+			// Clamp to the tile bounds.
+			xmin = std::clamp(xmin, tileStartX, tileEndX - 1);
+			xmax = std::clamp(xmax, tileStartX, tileEndX - 1);
+			ymin = std::clamp(ymin, tileStartY, tileEndY - 1);
+			ymax = std::clamp(ymax, tileStartY, tileEndY - 1);
 
 			for (int y = ymin; y <= ymax; ++y)
 			{
@@ -472,8 +475,9 @@ private:
 
 	void setupTriangles()
 	{
-		//memset(binData, 0, NUM_TX * NUM_TY * MAX_TRI_PER_TILE * sizeof(int));
+		// reset
 		memset(binCount, 0, NUM_TX * NUM_TY * sizeof(int));
+		activeTiles.clear();
 
 		// bin each triangle by it's bounding box
 		for (int ti = 0; ti < (int)usedTriangles; ++ti)
@@ -496,7 +500,12 @@ private:
 				for (int tx = tx0; tx <= tx1; ++tx)
 				{
 					int idx = ty * NUM_TX + tx;
-					int c = binCount[idx]++;
+
+					// if first time we touch this bin, record it:
+					if (binCount[idx]++ == 0)
+						activeTiles.push_back(idx);
+
+					int c = binCount[idx] - 1;
 					assert(c < MAX_TRI_PER_TILE);
 					binData[idx * MAX_TRI_PER_TILE + c] = ti;	// binData[idx][c] = ti;
 				}
@@ -519,14 +528,17 @@ private:
 	static constexpr int W = 800;      
 	static constexpr int H = 600;      
 	static constexpr int TILE_W = 64;	// tile size
-	static constexpr int TILE_H = 128;
-	static constexpr int NUM_TX = (W + TILE_W - 1) / TILE_W;
-	static constexpr int NUM_TY = (H + TILE_H - 1) / TILE_H;
-	static constexpr int MAX_TRI_PER_TILE = 16;
+	static constexpr int TILE_H = 64;
+	static constexpr int NUM_TX = (W + TILE_W - 1) / TILE_W;  // (800+63)/64 = 13
+	static constexpr int NUM_TY = (H + TILE_H - 1) / TILE_H;  // (600+63)/64 = 10
+	static constexpr int MAX_TRI_PER_TILE = 10000;
+	std::vector<int> activeTiles;
 
 	//std::vector<Triangle> triangles;
 	Triangle* triangles = nullptr;
 	size_t usedTriangles = 0;
 	int* binData = nullptr;		// [NUM_TX * NUM_TY][MAX_TRI_PER_TILE]
 	int* binCount = nullptr;	// [NUM_TX * NUM_TY]
+
+	std::atomic<size_t> next_tile{ 0 };
 };

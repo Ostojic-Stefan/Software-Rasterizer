@@ -4,9 +4,9 @@ mode_scene::mode_scene(rnd::framebuffer& fb)
 	:
 	_fb(fb),
 	_generic_renderer(fb),
-	_camera(10.f),
+	_camera(15.f),
 	_cam_ctrl(_camera),
-	the_model("../assets/models/cube.obj")
+	the_model("../assets/models/suzanne.obj")
 {
 	_generic_renderer.SetViewport({ 0, 0 }, { 800, 600 });
 	_generic_renderer.BindShaderProgram(&_shader_program);
