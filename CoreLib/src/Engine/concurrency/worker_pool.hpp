@@ -1,94 +1,141 @@
 #pragma once
-
-#include "ts_ring_buffer.hpp"
-#include "types.hpp"
-
-#include <functional>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <atomic>
+#include <condition_variable>
+#include <deque>
+#include <functional>
 #include <future>
-
-#include "core.hpp"
+#include <mutex>
+#include <thread>
+#include <iostream>
+#include <vector>
 
 namespace rnd
 {
-	class worker_pool
-	{
-	public:
-		using Task = std::move_only_function<void()>;
 
-		worker_pool(rnd::sz num_threads)
-		{
-			for (rnd::sz i = 0; i < num_threads; ++i)
-			{
-				// start up all the threads
-				std::thread worker(&worker_pool::run, this);
-				worker.detach();
-			}
-		}
+    class worker_pool
+    {
+    public:
+        using Task = std::move_only_function<void()>;
 
-		template <typename Fn, typename... Args>
-		auto execute(Fn&& func, Args&& ...args)
-		{
-			const auto no_param_fn = std::bind(std::forward<Fn>(func), std::forward<Args>(args)...);
-			std::packaged_task<std::invoke_result_t<Fn, Args...>()> pack_task{ no_param_fn };
-			auto fut = pack_task.get_future();
-			_task_buffer.push(std::move(pack_task));
-			_submitted_tasks += 1;
-			return fut;
-		}
+        explicit worker_pool(size_t num_threads)
+        {
+            for (size_t i = 0; i < num_threads; ++i)
+            {
+                _workers.emplace_back(&worker_pool::run, this);
+            }
+        }
 
-		template <typename Fn, typename... Args>
-		void dispatch(rnd::u32 num_jobs, rnd::u32 group_size, Fn&& job, Args&&...args)
-		{
-			ASSERT(num_jobs != 0 && group_size != 0, "number of jobs and groups size must be greater than 0");
+        ~worker_pool() {
+            {
+                // Signal shutdown
+                std::lock_guard lk(_mtx);
+                _shutdown = true;
+            }
+            _cv.notify_all();
+            for (auto& t : _workers)
+                if (t.joinable())
+                    t.join();
+        }
 
-			const rnd::u32 group_count = (num_jobs + group_size - 1) / group_size;
-			_submitted_tasks += group_count;
+        // Submit a single task and get a future for its result.
+        template <typename Fn, typename... Args>
+        auto execute(Fn&& func, Args&&... args) -> std::future<std::invoke_result_t<Fn, Args...>>
+        {
+            using R = std::invoke_result_t<Fn, Args...>;
+            auto bound = std::bind(std::forward<Fn>(func), std::forward<Args>(args)...);
+            auto task_ptr = std::make_shared<std::packaged_task<R()>>(std::move(bound));
+            std::future<R> fut = task_ptr->get_future();
+            {
+                std::lock_guard lk(_mtx);
+                _tasks.emplace_back([task_ptr]() {
+                    (*task_ptr)();
+                    });
+                _submitted_tasks.fetch_add(1, std::memory_order_relaxed);
+            }
+            _cv.notify_one();
+            return fut;
+        }
 
-			auto bound_job = std::bind(std::forward<Fn>(job), std::placeholders::_1, std::forward<Args>(args)...);
+        // Submit N jobs of size group_size each; no future returned.
+        template <typename Fn, typename... Args>
+        void dispatch(unsigned num_jobs, unsigned group_size, Fn&& job, Args&&... args) {
+            if (num_jobs == 0 || group_size == 0) throw std::invalid_argument("num_jobs/group_size must be > 0");
+            unsigned group_count = (num_jobs + group_size - 1) / group_size;
+            auto bound_job = std::bind(std::forward<Fn>(job), std::placeholders::_1, std::forward<Args>(args)...);
 
-			for (rnd::u32 gi = 0; gi < group_count; ++gi)
-			{
-				_task_buffer.push([gi, group_size, num_jobs, bound_job]() mutable
-					{
-						const rnd::u32 start = gi * group_size;
-						const rnd::u32 end = std::min(start + group_size, num_jobs);
-						for (rnd::u32 i = start; i < end; ++i)
-							bound_job(i);
-					});
-			}
-		}
+            {
+                std::lock_guard lk(_mtx);
+                _submitted_tasks.fetch_add(group_count, std::memory_order_relaxed);
 
-		void wait_for_all_done()
-		{
-			std::unique_lock lck{ _mtx };
-			_all_done.wait(lck, [this] {
-				return _submitted_tasks == _finished_tasks;
-				});
-		}
+                for (unsigned gi = 0; gi < group_count; ++gi) {
+                    _tasks.emplace_back(
+                        [gi, group_size, num_jobs, bound_job]() mutable {
+                            unsigned start = gi * group_size;
+                            unsigned end = std::min(start + group_size, num_jobs);
+                            for (unsigned i = start; i < end; ++i) {
+                                bound_job(i);
+                            }
+                        }
+                    );
+                }
+            }
+            _cv.notify_all();
+        }
 
-	private:
-		void run()
-		{
-			for (;;)
-			{
-				Task t = std::move(_task_buffer.pop());
-				t();
-				_finished_tasks.fetch_add(1);
-				if (_submitted_tasks == _finished_tasks)
-					_all_done.notify_all();
-			}
-		}
+        // Block until all submitted tasks have finished.
+        void wait_for_all_done()
+        {
+            std::unique_lock lk(_mtx);
+            _cv.wait(lk, [this] {
+                return _finished_tasks.load(std::memory_order_acquire)
+                    == _submitted_tasks.load(std::memory_order_acquire);
+                });
+        }
 
-	private:
-		rnd::ts_ring_buffer<Task, 256> _task_buffer;
-		std::mutex _mtx;
-		std::condition_variable _all_done;
+    private:
+        // Worker thread main loop
+        void run()
+        {
+            for (;;)
+            {
+                Task task;
+                {
+                    std::unique_lock lk(_mtx);
+                    _cv.wait(lk, [this] {
+                        return _shutdown || !_tasks.empty();
+                        });
+                    if (_shutdown && _tasks.empty())
+                        break;
+                    task = std::move(_tasks.front());
+                    _tasks.pop_front();
+                }
 
-		rnd::sz _submitted_tasks = 0;
-		std::atomic<rnd::sz> _finished_tasks = 0;
-	};
+                // Execute outside lock
+                task();
+                // std::cout << "thread [ " << std::this_thread::get_id() << " ]" << " finished task \n";
+
+                // Signal completion
+                if (_finished_tasks.fetch_add(1, std::memory_order_acq_rel) + 1
+                    == _submitted_tasks.load(std::memory_order_acquire))
+                {
+                    // last task finished, wake any waiters
+                    std::lock_guard lk(_mtx);
+                    _cv.notify_all();
+                }
+            }
+        }
+
+        // queue + threads
+        std::deque<Task>              _tasks;
+        std::vector<std::thread>      _workers;
+
+        // synchronization
+        std::mutex                    _mtx;
+        std::condition_variable       _cv;
+        bool                          _shutdown{ false };
+
+        // counters
+        std::atomic<size_t>           _submitted_tasks{ 0 };
+        std::atomic<size_t>           _finished_tasks{ 0 };
+    };
 }

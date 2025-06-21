@@ -103,10 +103,9 @@ namespace rnd
 
 		inline const f32* get_depth_buffer() const { return depth_buffer.get(); }
 
-	private:
+	public:
 		u32 width, height;
 		std::unique_ptr<color[]> color_buffer;
-		//std::unique_ptr<u32[]> depth_buffer;
 		std::unique_ptr<f32[]> depth_buffer;
 	};
 

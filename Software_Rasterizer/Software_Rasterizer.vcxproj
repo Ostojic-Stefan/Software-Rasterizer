@@ -178,6 +178,7 @@
     <ClInclude Include="renderer\model.hpp" />
     <ClInclude Include="renderer\varying.hpp" />
     <ClInclude Include="scene.hpp" />
+    <ClInclude Include="SimpleThreadPool.h" />
     <ClInclude Include="the_renderer.hpp" />
     <ClInclude Include="renderer\viewport.hpp" />
   </ItemGroup>

@@ -6,6 +6,8 @@
 #include <array>
 #include <type_traits>
 #include <functional>
+#include <span>
+#include <memory>
 
 #include "types.hpp"
 #include "math/vector.hpp"
@@ -15,32 +17,81 @@
 #include "buffers.hpp"
 #include "varying.hpp"
 #include "handle_manager.hpp"
+#include "frame_buffer.hpp"
 
-#include "concurrency/worker_pool.hpp"
+#include "SimpleThreadPool.h"
 
-struct Triangle 
+struct Triangle
 {
 	VSOutput v0, v1, v2;
 	rnd::f32 area;
+
+	bool culled = false;
+};
+
+struct TileRasterizerFunctor
+{
+	//TileRasterizerFunctor(rnd::u32 tileWidth, rnd::u32 tileHeight)
+	//	:
+	//	local_fb(tileWidth, tileHeight)
+	//{}
+
+	void operator()(int tileStartX, int tileStartY, int tileEndX, int tileEndY, std::vector<Triangle> triangles, rnd::color* color_buffer, rnd::f32* depth_buffer, rnd::u32 fb_width)
+	{
+		for (const auto& t : triangles)
+		{
+			// calculate the god damn triangle's bounding box here jesus christ.
+			rnd::i32 xmin = (rnd::i32)util::min3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+			rnd::i32 xmax = (rnd::i32)util::max3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+			rnd::i32 ymin = (rnd::i32)util::min3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+			rnd::i32 ymax = (rnd::i32)util::max3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+
+			// Clamp to the tile bounds.
+			xmin = std::clamp(xmin, tileStartX, tileEndX - 1);
+			xmax = std::clamp(xmax, tileStartX, tileEndX - 1);
+			ymin = std::clamp(ymin, tileStartY, tileEndY - 1);
+			ymax = std::clamp(ymax, tileStartY, tileEndY - 1);
+
+			for (int y = ymin; y <= ymax; ++y)
+			{
+				for (int x = xmin; x <= xmax; ++x)
+				{
+					math::vec4 p{ x + 0.5f, y + 0.5f, 0.f, 0.f };
+
+					float det01p = math::det_2d(t.v1.Position - t.v0.Position, p - t.v0.Position);
+					float det12p = math::det_2d(t.v2.Position - t.v1.Position, p - t.v1.Position);
+					float det20p = math::det_2d(t.v0.Position - t.v2.Position, p - t.v2.Position);
+
+					if (det01p < 0.f || det12p < 0.f || det20p < 0.f)
+						continue;
+
+					color_buffer[y * fb_width + x] = rnd::red;
+					//local_fb.put_pixel((int)x, (int)y, rnd::red);
+				}
+			}
+		}
+	}
 };
 
 template <typename ShaderProgram>
 struct Renderer
 {
 	static constexpr size_t MAX_TRIS = 15'000;
+	static constexpr size_t nThreads = 4;
 
 	Renderer(rnd::framebuffer& fb)
 		:
-		_fb(fb)
+		_fb(fb),
+		_threadPool(nThreads)
 	{
 		binData = (int*)std::malloc(NUM_TX * NUM_TY * MAX_TRI_PER_TILE * sizeof(int));
-		binCount = (int*)std::calloc(NUM_TX * NUM_TY, sizeof(int));
+		//binCount = (std::atomic<int>*)std::calloc(NUM_TX * NUM_TY, sizeof(int));
+		binCount = std::make_unique<std::atomic<int>[]>(NUM_TX * NUM_TY);
 
 		// TODO: maybe not...
 		triangles = (Triangle*)std::malloc(MAX_TRIS * sizeof(Triangle));
-		usedTriangles = 0;
 
-		activeTiles.reserve(NUM_TX * NUM_TY);
+		//activeTiles.reserve(NUM_TX * NUM_TY);
 	}
 
 	void BindShaderProgram(const ShaderProgram* program)
@@ -105,92 +156,63 @@ struct Renderer
 	{
 		assert(boundBuffer);
 		assert(boundIndexBuffer);
-		usedTriangles = 0;
+
+		//memset(binCount, 0, NUM_TX * NUM_TY * sizeof(int));
+		for (size_t i = 0; i < NUM_TX * NUM_TY; ++i)
+			binCount[i].store(0, std::memory_order_relaxed);
 
 		size_t nTriangles = num_indices / 3;
 
-		// for each triangle
-		for (int i = 0; i < nTriangles; ++i)
+		const size_t triPerThread = (nTriangles + (nThreads - 1)) / nThreads;
+
+		for (int i = 0; i < nThreads; ++i)
 		{
-			VSInput input0{};
-			VSInput input1{};
-			VSInput input2{};
+			const int start = i * triPerThread;
+			const int end = std::min(start + triPerThread, nTriangles);
 
-			rnd::u16 idx0 = boundIndexBuffer->data[i * 3 + 0];
-			rnd::u16 idx1 = boundIndexBuffer->data[i * 3 + 1];
-			rnd::u16 idx2 = boundIndexBuffer->data[i * 3 + 2];
-
-			// for each attribute in the vertex
-			for (const VertexAttrib& a : boundBuffer->get_attribs())
-			{
-				const uint8_t* ptr0 = boundBuffer->get_data() + boundBuffer->get_stride() * idx0 + a.offset;
-				const uint8_t* ptr1 = boundBuffer->get_data() + boundBuffer->get_stride() * idx1 + a.offset;
-				const uint8_t* ptr2 = boundBuffer->get_data() + boundBuffer->get_stride() * idx2 + a.offset;
-
-				GenericValue val0 = extract_vertex_attribute(ptr0, a);
-				GenericValue val1 = extract_vertex_attribute(ptr1, a);
-				GenericValue val2 = extract_vertex_attribute(ptr2, a);
-
-				input0.Set(a.slot, val0);
-				input1.Set(a.slot, val1);
-				input2.Set(a.slot, val2);
-			}
-			VSOutput vsout[3];
-
-			// vertex shader
-			vsout[0] = program->vs(input0);
-			vsout[1] = program->vs(input1);
-			vsout[2] = program->vs(input2);
-
-			// perspective division and viewport trasnform
-			vsout[0].Position = _viewport.transform(perspective_divide(vsout[0].Position));
-			vsout[1].Position = _viewport.transform(perspective_divide(vsout[1].Position));
-			vsout[2].Position = _viewport.transform(perspective_divide(vsout[2].Position));
-
-			// perspective correction
-			std::size_t sz = vsout->Size();
-			for (int j = 0; j < sz; ++j)
-			{
-				GenericValue& gv0 = vsout[0].varyings[j];
-				GenericValue& gv1 = vsout[1].varyings[j];
-				GenericValue& gv2 = vsout[2].varyings[j];
-
-				const std::size_t sz = gv0.count;
-				for (int j = 0; j < sz; ++j)
-				{
-					gv0.vals[j] = gv0.vals[j] * vsout[0].Position.w;
-					gv1.vals[j] = gv1.vals[j] * vsout[1].Position.w;
-					gv2.vals[j] = gv2.vals[j] * vsout[2].Position.w;
-				}
-			}
-
-			rnd::f32 area = math::det_2d(
-				vsout[1].Position - vsout[0].Position,
-				vsout[2].Position - vsout[0].Position
-			);
-
-			// backface culling
-			const rnd::b8 ccw = area < 0.f;
-			if (!ccw)
-				continue;
-			std::swap(vsout[1], vsout[2]);
-			area = -area;
-
-			triangles[usedTriangles++] = Triangle{ vsout[0], vsout[1], vsout[2], area };
+			_threadPool.enqueue([this, start, end] {
+				processTriangleVertices(start, end, triangles);
+			});
 		}
+
+		_threadPool.waitAll();
 
 		// setup triangles for tiled rendering
-		setupTriangles();
+		//setupTriangles(nTriangles);
 
 		// rasterize tiles
-		for (int idx : activeTiles)
+		for (int ty = 0; ty < NUM_TY; ++ty)
 		{
-			int tx = idx % NUM_TX;
-			int ty = idx / NUM_TX;
+			for (int tx = 0; tx < NUM_TX; ++tx)
+			{
+				int idx = ty * NUM_TX + tx;
+				if (binCount[idx] > 0)
+				{
+					int tileStartX = tx * TILE_W;
+					int tileStartY = ty * TILE_H;
+					int tileEndX = std::min(tileStartX + TILE_W, W);
+					int tileEndY = std::min(tileStartY + TILE_H, H);
 
-			rasterizeTile(tx, ty);
+					std::vector<Triangle> tris;
+					tris.reserve(binCount[idx]);
+					for (int bi = 0; bi < binCount[idx].load(); ++bi)
+					{
+						const Triangle& t = triangles[binData[idx * MAX_TRI_PER_TILE + bi]];
+						tris.push_back(t);
+					}
+
+					_threadPool.enqueue([this, tileStartX, tileStartY, tileEndX, tileEndY, t = std::move(tris)]
+					{
+						TileRasterizerFunctor()(tileStartX, tileStartY, tileEndX, tileEndY, std::move(t), _fb.color_buffer.get(), _fb.depth_buffer.get(), _fb.get_width());
+					});
+				}
+
+			}
 		}
+
+		_threadPool.waitAll();
 	}
+
 
 	void DrawIndexed(size_t num_indices)
 	{
@@ -429,60 +451,213 @@ private:
 		return v;
 	}
 private:
-	// binning
-	void rasterizeTile(int tx, int ty)
+
+	// instance data:
+	// 1. boundIndexBuffer
+	// 2. boundBuffer
+	// 3. shaderProgram
+	// 4. viewport
+	void processTriangleVertices(int startRange, int endRange, Triangle* out)
 	{
-		int idx = ty * NUM_TX + tx;
-
-		for (int bi = 0; bi < binCount[idx]; ++bi) 
+		for (int i = startRange; i < endRange; ++i)
 		{
-			const Triangle& t = triangles[binData[idx * MAX_TRI_PER_TILE + bi]];
-			int tileStartX = tx * TILE_W;
-			int tileStartY = ty * TILE_H;
-			int tileEndX = std::min(tileStartX + TILE_W, W);
-			int tileEndY = std::min(tileStartY + TILE_H, H);
+			VSInput input0{};
+			VSInput input1{};
+			VSInput input2{};
 
-			// calculate the god damn triangle's bounding box here jesus christ.
-			rnd::i32 xmin = (rnd::i32)util::min3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
-			rnd::i32 xmax = (rnd::i32)util::max3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
-			rnd::i32 ymin = (rnd::i32)util::min3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
-			rnd::i32 ymax = (rnd::i32)util::max3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+			rnd::u16 idx0 = boundIndexBuffer->data[i * 3 + 0];
+			rnd::u16 idx1 = boundIndexBuffer->data[i * 3 + 1];
+			rnd::u16 idx2 = boundIndexBuffer->data[i * 3 + 2];
 
-			// Clamp to the tile bounds.
-			xmin = std::clamp(xmin, tileStartX, tileEndX - 1);
-			xmax = std::clamp(xmax, tileStartX, tileEndX - 1);
-			ymin = std::clamp(ymin, tileStartY, tileEndY - 1);
-			ymax = std::clamp(ymax, tileStartY, tileEndY - 1);
-
-			for (int y = ymin; y <= ymax; ++y)
+			for (const VertexAttrib& a : boundBuffer->get_attribs())
 			{
-				for (int x = xmin; x <= xmax; ++x)
+				const uint8_t* ptr0 = boundBuffer->get_data() + boundBuffer->get_stride() * idx0 + a.offset;
+				const uint8_t* ptr1 = boundBuffer->get_data() + boundBuffer->get_stride() * idx1 + a.offset;
+				const uint8_t* ptr2 = boundBuffer->get_data() + boundBuffer->get_stride() * idx2 + a.offset;
+
+				GenericValue val0 = extract_vertex_attribute(ptr0, a);
+				GenericValue val1 = extract_vertex_attribute(ptr1, a);
+				GenericValue val2 = extract_vertex_attribute(ptr2, a);
+
+				input0.Set(a.slot, val0);
+				input1.Set(a.slot, val1);
+				input2.Set(a.slot, val2);
+			}
+
+			VSOutput vsout[3];
+
+			// vertex shader
+			vsout[0] = program->vs(input0);
+			vsout[1] = program->vs(input1);
+			vsout[2] = program->vs(input2);
+
+			// perspective division and viewport trasnform
+			vsout[0].Position = _viewport.transform(perspective_divide(vsout[0].Position));
+			vsout[1].Position = _viewport.transform(perspective_divide(vsout[1].Position));
+			vsout[2].Position = _viewport.transform(perspective_divide(vsout[2].Position));
+
+			// perspective correction
+			std::size_t sz = vsout->Size();
+			for (int j = 0; j < sz; ++j)
+			{
+				GenericValue& gv0 = vsout[0].varyings[j];
+				GenericValue& gv1 = vsout[1].varyings[j];
+				GenericValue& gv2 = vsout[2].varyings[j];
+
+				const std::size_t sz = gv0.count;
+				for (int j = 0; j < sz; ++j)
 				{
-					math::vec4 p{ x + 0.5f, y + 0.5f, 0.f, 0.f };
+					gv0.vals[j] = gv0.vals[j] * vsout[0].Position.w;
+					gv1.vals[j] = gv1.vals[j] * vsout[1].Position.w;
+					gv2.vals[j] = gv2.vals[j] * vsout[2].Position.w;
+				}
+			}
 
-					float det01p = math::det_2d(t.v1.Position - t.v0.Position, p - t.v0.Position);
-					float det12p = math::det_2d(t.v2.Position - t.v1.Position, p - t.v1.Position);
-					float det20p = math::det_2d(t.v0.Position - t.v2.Position, p - t.v2.Position);
+			rnd::f32 area = math::det_2d(
+				vsout[1].Position - vsout[0].Position,
+				vsout[2].Position - vsout[0].Position
+			);
 
-					if (det01p < 0.f || det12p < 0.f || det20p < 0.f)
-						continue;
+			bool culled = false;
 
-					_fb.put_pixel((int)x, (int)y, rnd::red);
+			// backface culling
+			const rnd::b8 ccw = area < 0.f;
+			if (!ccw)
+				culled = true;
+
+			std::swap(vsout[1], vsout[2]);
+			area = -area;
+
+			out[i] = Triangle{ vsout[0], vsout[1], vsout[2], area, culled };
+
+		}
+
+		setupTrianglesRange(startRange, endRange, out);
+	}
+
+	//void rasterizeTile(rnd::framebuffer& fb, int tileStartX, int tileStartY, int tileEndX, int tileEndY, std::vector<Triangle> triangles)
+	//{
+	//	for (const auto& t : triangles)
+	//	{
+	//		// calculate the god damn triangle's bounding box here jesus christ.
+	//		rnd::i32 xmin = (rnd::i32)util::min3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+	//		rnd::i32 xmax = (rnd::i32)util::max3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+	//		rnd::i32 ymin = (rnd::i32)util::min3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+	//		rnd::i32 ymax = (rnd::i32)util::max3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+
+	//		// Clamp to the tile bounds.
+	//		xmin = std::clamp(xmin, tileStartX, tileEndX - 1);
+	//		xmax = std::clamp(xmax, tileStartX, tileEndX - 1);
+	//		ymin = std::clamp(ymin, tileStartY, tileEndY - 1);
+	//		ymax = std::clamp(ymax, tileStartY, tileEndY - 1);
+
+	//		for (int y = ymin; y <= ymax; ++y)
+	//		{
+	//			for (int x = xmin; x <= xmax; ++x)
+	//			{
+	//				math::vec4 p{ x + 0.5f, y + 0.5f, 0.f, 0.f };
+
+	//				float det01p = math::det_2d(t.v1.Position - t.v0.Position, p - t.v0.Position);
+	//				float det12p = math::det_2d(t.v2.Position - t.v1.Position, p - t.v1.Position);
+	//				float det20p = math::det_2d(t.v0.Position - t.v2.Position, p - t.v2.Position);
+
+	//				if (det01p < 0.f || det12p < 0.f || det20p < 0.f)
+	//					continue;
+
+	//				fb.put_pixel((int)x, (int)y, rnd::red);
+	//			}
+	//		}
+	//	}
+
+	// binning
+	//void rasterizeTile(int tx, int ty, int idx)
+	//{
+	//	for (int bi = 0; bi < binCount[idx]; ++bi) 
+	//	{
+	//		const Triangle& t = triangles[binData[idx * MAX_TRI_PER_TILE + bi]];
+	//		int tileStartX = tx * TILE_W;
+	//		int tileStartY = ty * TILE_H;
+	//		int tileEndX = std::min(tileStartX + TILE_W, W);
+	//		int tileEndY = std::min(tileStartY + TILE_H, H);
+
+	//		// calculate the god damn triangle's bounding box here jesus christ.
+	//		rnd::i32 xmin = (rnd::i32)util::min3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+	//		rnd::i32 xmax = (rnd::i32)util::max3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+	//		rnd::i32 ymin = (rnd::i32)util::min3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+	//		rnd::i32 ymax = (rnd::i32)util::max3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+
+	//		// Clamp to the tile bounds.
+	//		xmin = std::clamp(xmin, tileStartX, tileEndX - 1);
+	//		xmax = std::clamp(xmax, tileStartX, tileEndX - 1);
+	//		ymin = std::clamp(ymin, tileStartY, tileEndY - 1);
+	//		ymax = std::clamp(ymax, tileStartY, tileEndY - 1);
+
+	//		for (int y = ymin; y <= ymax; ++y)
+	//		{
+	//			for (int x = xmin; x <= xmax; ++x)
+	//			{
+	//				math::vec4 p{ x + 0.5f, y + 0.5f, 0.f, 0.f };
+
+	//				float det01p = math::det_2d(t.v1.Position - t.v0.Position, p - t.v0.Position);
+	//				float det12p = math::det_2d(t.v2.Position - t.v1.Position, p - t.v1.Position);
+	//				float det20p = math::det_2d(t.v0.Position - t.v2.Position, p - t.v2.Position);
+
+	//				if (det01p < 0.f || det12p < 0.f || det20p < 0.f)
+	//					continue;
+
+	//				_fb.put_pixel((int)x, (int)y, rnd::red);
+	//			}
+	//		}
+	//	}
+	//}
+
+	void setupTrianglesRange(int start, int end, const Triangle* triangles)
+	{
+		for (int ti = start; ti < end; ++ti)
+		{
+			const Triangle& t = triangles[ti];
+
+			if (t.culled)
+				continue;
+
+			// bbox
+			const int minX = std::floor(std::min({ t.v0.Position.x, t.v1.Position.x, t.v2.Position.x }));
+			const int maxX = std::ceil(std::max({ t.v0.Position.x, t.v1.Position.x, t.v2.Position.x }));
+			const int minY = std::floor(std::min({ t.v0.Position.y, t.v1.Position.y, t.v2.Position.y }));
+			const int maxY = std::ceil(std::max({ t.v0.Position.y, t.v1.Position.y, t.v2.Position.y }));
+
+			// tile bounds
+			const int tx0 = std::max(0, minX / TILE_W);
+			const int tx1 = std::min(NUM_TX - 1, maxX / TILE_W);
+			const int ty0 = std::max(0, minY / TILE_H);
+			const int ty1 = std::min(NUM_TY - 1, maxY / TILE_H);
+
+			for (int ty = ty0; ty <= ty1; ++ty)
+			{
+				for (int tx = tx0; tx <= tx1; ++tx)
+				{
+					int idx = ty * NUM_TX + tx;
+
+					//int c = binCount[idx]++;
+					int c = binCount[idx].fetch_add(1, std::memory_order_relaxed);
+
+					assert(c < MAX_TRI_PER_TILE);
+					binData[idx * MAX_TRI_PER_TILE + c] = ti;	// binData[idx][c] = ti;
 				}
 			}
 		}
 	}
 
-	void setupTriangles()
+	void setupTriangles(int nTriangles)
 	{
-		// reset
-		memset(binCount, 0, NUM_TX * NUM_TY * sizeof(int));
-		activeTiles.clear();
-
 		// bin each triangle by it's bounding box
-		for (int ti = 0; ti < (int)usedTriangles; ++ti)
+		for (int ti = 0; ti < nTriangles; ++ti)
 		{
 			Triangle& t = triangles[ti];
+
+			if (t.culled)
+				continue;
+
 			// bbox
 			int minX = std::floor(std::min({ t.v0.Position.x, t.v1.Position.x, t.v2.Position.x }));
 			int maxX = std::ceil(std::max({ t.v0.Position.x, t.v1.Position.x, t.v2.Position.x }));
@@ -501,11 +676,7 @@ private:
 				{
 					int idx = ty * NUM_TX + tx;
 
-					// if first time we touch this bin, record it:
-					if (binCount[idx]++ == 0)
-						activeTiles.push_back(idx);
-
-					int c = binCount[idx] - 1;
+					int c = binCount[idx].fetch_add(1, std::memory_order_relaxed);
 					assert(c < MAX_TRI_PER_TILE);
 					binData[idx * MAX_TRI_PER_TILE + c] = ti;	// binData[idx][c] = ti;
 				}
@@ -527,18 +698,17 @@ private:
 	// binning
 	static constexpr int W = 800;      
 	static constexpr int H = 600;      
-	static constexpr int TILE_W = 64;	// tile size
+	static constexpr int TILE_W = 128;	// tile size
 	static constexpr int TILE_H = 64;
 	static constexpr int NUM_TX = (W + TILE_W - 1) / TILE_W;  // (800+63)/64 = 13
 	static constexpr int NUM_TY = (H + TILE_H - 1) / TILE_H;  // (600+63)/64 = 10
 	static constexpr int MAX_TRI_PER_TILE = 10000;
-	std::vector<int> activeTiles;
+	// std::vector<int> activeTiles;
 
 	//std::vector<Triangle> triangles;
 	Triangle* triangles = nullptr;
-	size_t usedTriangles = 0;
 	int* binData = nullptr;		// [NUM_TX * NUM_TY][MAX_TRI_PER_TILE]
-	int* binCount = nullptr;	// [NUM_TX * NUM_TY]
-
-	std::atomic<size_t> next_tile{ 0 };
+	//std::atomic<int>* binCount = nullptr;	// [NUM_TX * NUM_TY]
+	std::unique_ptr<std::atomic<int>[]> binCount;
+	ThreadPool _threadPool;
 };
