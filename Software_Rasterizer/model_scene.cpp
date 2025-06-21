@@ -1,10 +1,12 @@
 #include "model_scene.hpp"
 
+#include "input.hpp"
+
 mode_scene::mode_scene(rnd::framebuffer& fb)
 	:
 	_fb(fb),
 	_generic_renderer(fb),
-	_camera(20.f),
+	_camera(5.f),
 	_cam_ctrl(_camera),
 	the_model("../assets/models/nanosuit.obj")
 {
@@ -30,7 +32,7 @@ mode_scene::mode_scene(rnd::framebuffer& fb)
 		_generic_renderer.SetVertexAttribute({ AttribType::Float, 3, offsetof(gfx::vertex, normal), 1 });
 		_generic_renderer.SetVertexAttribute({ AttribType::Float, 2, offsetof(gfx::vertex, tex_coords), 2 });
 		_generic_renderer.SetVertexAttribute({ AttribType::Float, 3, offsetof(gfx::vertex, tangent), 3 });
-		_generic_renderer.SetVertexAttribute({ AttribType::Float, 3, offsetof(gfx::vertex, bitangent), 4});
+		_generic_renderer.SetVertexAttribute({ AttribType::Float, 3, offsetof(gfx::vertex, bitangent), 4 });
 
 		mesh.iboid = _generic_renderer.CreateIndexBuffer(mesh.indices.data(), mesh.indices.size());
 		_generic_renderer.BindIndexBuffer(mesh.iboid);
@@ -45,12 +47,16 @@ void mode_scene::update(rnd::f32 dt)
 	_cam_ctrl.update(dt);
 
 	static constexpr float light_dist = 15.f;
-	_point_light.position = {light_dist * std::cos(total_time*.5f), 0.f, light_dist * std::sin(total_time * .5f) };
+	_point_light.position = { light_dist * std::cos(total_time * .5f), 0.f, light_dist * std::sin(total_time * .5f) };
 
 	_shader_program.fs.bind_view_direction(_camera.get_position());
 
 	//_shader_program.vs.total_time += dt;
 }
+
+enum class REND_TYPE : int { NON_MT, MT, COUNT };
+
+static REND_TYPE rend_type = REND_TYPE::MT;
 
 void mode_scene::render()
 {
@@ -64,12 +70,26 @@ void mode_scene::render()
 		_generic_renderer.BindVertexBuffer(mesh.vboid);
 		_generic_renderer.BindIndexBuffer(mesh.iboid);
 
-		_generic_renderer.DrawIndexedBin(mesh.indices.size());
+		if (rnd::input::is_key_pressed(rnd::input::key_code::KP_1))
+		{
+			rend_type = REND_TYPE::NON_MT;
+		}
 
-		//_generic_renderer.DrawIndexed(mesh.indices.size());
+		else if (rnd::input::is_key_pressed(rnd::input::key_code::KP_2))
+		{
+			rend_type = REND_TYPE::MT;
+		}
+
+		switch (rend_type)	
+		{
+		case REND_TYPE::MT:
+			_generic_renderer.DrawIndexedBin(mesh.indices.size());
+			break;
+		case REND_TYPE::NON_MT:
+			_generic_renderer.DrawIndexed(mesh.indices.size());
+			break;
+		}
 	}
-
-	int a = 5;
 }
 
 ////////// SHADERS //////////

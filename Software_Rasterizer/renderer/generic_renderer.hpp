@@ -31,43 +31,34 @@ struct Triangle
 
 struct TileRasterizerFunctor
 {
-	//TileRasterizerFunctor(rnd::u32 tileWidth, rnd::u32 tileHeight)
-	//	:
-	//	local_fb(tileWidth, tileHeight)
-	//{}
-
-	void operator()(int tileStartX, int tileStartY, int tileEndX, int tileEndY, std::vector<Triangle> triangles, rnd::color* color_buffer, rnd::f32* depth_buffer, rnd::u32 fb_width)
+	void operator()(int tileStartX, int tileStartY, int tileEndX, int tileEndY, const Triangle& t, rnd::color* color_buffer, rnd::f32* depth_buffer, rnd::u32 fb_width, rnd::color col)
 	{
-		for (const auto& t : triangles)
+		// calculate the god damn triangle's bounding box here jesus christ.
+		rnd::i32 xmin = (rnd::i32)util::min3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+		rnd::i32 xmax = (rnd::i32)util::max3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
+		rnd::i32 ymin = (rnd::i32)util::min3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+		rnd::i32 ymax = (rnd::i32)util::max3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
+
+		// Clamp to the tile bounds.
+		xmin = std::clamp(xmin, tileStartX, tileEndX - 1);
+		xmax = std::clamp(xmax, tileStartX, tileEndX - 1);
+		ymin = std::clamp(ymin, tileStartY, tileEndY - 1);
+		ymax = std::clamp(ymax, tileStartY, tileEndY - 1);
+
+		for (int y = ymin; y <= ymax; ++y)
 		{
-			// calculate the god damn triangle's bounding box here jesus christ.
-			rnd::i32 xmin = (rnd::i32)util::min3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
-			rnd::i32 xmax = (rnd::i32)util::max3(t.v0.Position.x, t.v1.Position.x, t.v2.Position.x);
-			rnd::i32 ymin = (rnd::i32)util::min3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
-			rnd::i32 ymax = (rnd::i32)util::max3(t.v0.Position.y, t.v1.Position.y, t.v2.Position.y);
-
-			// Clamp to the tile bounds.
-			xmin = std::clamp(xmin, tileStartX, tileEndX - 1);
-			xmax = std::clamp(xmax, tileStartX, tileEndX - 1);
-			ymin = std::clamp(ymin, tileStartY, tileEndY - 1);
-			ymax = std::clamp(ymax, tileStartY, tileEndY - 1);
-
-			for (int y = ymin; y <= ymax; ++y)
+			for (int x = xmin; x <= xmax; ++x)
 			{
-				for (int x = xmin; x <= xmax; ++x)
-				{
-					math::vec4 p{ x + 0.5f, y + 0.5f, 0.f, 0.f };
+				math::vec4 p{ x + 0.5f, y + 0.5f, 0.f, 0.f };
 
-					float det01p = math::det_2d(t.v1.Position - t.v0.Position, p - t.v0.Position);
-					float det12p = math::det_2d(t.v2.Position - t.v1.Position, p - t.v1.Position);
-					float det20p = math::det_2d(t.v0.Position - t.v2.Position, p - t.v2.Position);
+				float det01p = math::det_2d(t.v1.Position - t.v0.Position, p - t.v0.Position);
+				float det12p = math::det_2d(t.v2.Position - t.v1.Position, p - t.v1.Position);
+				float det20p = math::det_2d(t.v0.Position - t.v2.Position, p - t.v2.Position);
 
-					if (det01p < 0.f || det12p < 0.f || det20p < 0.f)
-						continue;
+				if (det01p < 0.f || det12p < 0.f || det20p < 0.f)
+					continue;
 
-					color_buffer[y * fb_width + x] = rnd::red;
-					//local_fb.put_pixel((int)x, (int)y, rnd::red);
-				}
+				color_buffer[y * fb_width + x] = col;
 			}
 		}
 	}
@@ -157,12 +148,10 @@ struct Renderer
 		assert(boundBuffer);
 		assert(boundIndexBuffer);
 
-		//memset(binCount, 0, NUM_TX * NUM_TY * sizeof(int));
-		for (size_t i = 0; i < NUM_TX * NUM_TY; ++i)
-			binCount[i].store(0, std::memory_order_relaxed);
+		for (std::atomic<int>* ptr = binCount.get(), *end = binCount.get() + (NUM_TX * NUM_TY); ptr != end; ++ptr)
+			ptr->store(0, std::memory_order_relaxed);
 
-		size_t nTriangles = num_indices / 3;
-
+		const size_t nTriangles = num_indices / 3;
 		const size_t triPerThread = (nTriangles + (nThreads - 1)) / nThreads;
 
 		for (int i = 0; i < nThreads; ++i)
@@ -177,10 +166,53 @@ struct Renderer
 
 		_threadPool.waitAll();
 
-		// setup triangles for tiled rendering
-		//setupTriangles(nTriangles);
+#if 1
+
+		constexpr size_t TILES_PER_THREAD = 8u;
 
 		// rasterize tiles
+		constexpr size_t totalTiles = NUM_TX * NUM_TY;
+		constexpr size_t numGroups = (totalTiles + TILES_PER_THREAD - 1) / TILES_PER_THREAD;
+
+		for (size_t group = 0; group < numGroups; ++group)
+		{
+			const size_t startIdx = group * TILES_PER_THREAD;
+			const size_t endIdx = std::min(startIdx + TILES_PER_THREAD, totalTiles);
+
+			_threadPool.enqueue([this, startIdx, endIdx] {
+				for (size_t idx = startIdx; idx < endIdx; ++idx)
+				{
+					// skip empty bins
+					if (binCount[idx].load(std::memory_order_relaxed) == 0)
+						continue;
+
+					const int ty = idx / NUM_TX;
+					const int tx = idx % NUM_TX;
+
+					const int tileStartX = tx * TILE_W;
+					const int tileStartY = ty * TILE_H;
+					const int tileEndX = std::min(tileStartX + TILE_W, W);
+					const int tileEndY = std::min(tileStartY + TILE_H, H);
+
+					for (int bi = 0, n = binCount[idx].load(); bi < n; ++bi)
+					{
+						TileRasterizerFunctor()(
+							tileStartX, tileStartY,
+							tileEndX, tileEndY,
+							triangles[binData[idx * MAX_TRI_PER_TILE + bi]],
+							_fb.color_buffer.get(),
+							_fb.depth_buffer.get(),
+							_fb.get_width(),
+							rnd::red
+						);
+					}
+				}
+			});
+		}
+		_threadPool.waitAll();
+
+#else
+		// old
 		for (int ty = 0; ty < NUM_TY; ++ty)
 		{
 			for (int tx = 0; tx < NUM_TX; ++tx)
@@ -201,19 +233,14 @@ struct Renderer
 						tris.push_back(t);
 					}
 
-					_threadPool.enqueue([this, tileStartX, tileStartY, tileEndX, tileEndY, t = std::move(tris)]
-					{
-						TileRasterizerFunctor()(tileStartX, tileStartY, tileEndX, tileEndY, std::move(t), _fb.color_buffer.get(), _fb.depth_buffer.get(), _fb.get_width());
-					});
+					TileRasterizerFunctor()(tileStartX, tileStartY, tileEndX, tileEndY, std::move(tris), _fb.color_buffer.get(), _fb.depth_buffer.get(), _fb.get_width());
 				}
-
 			}
 		}
 
-		_threadPool.waitAll();
+#endif
+		
 	}
-
-
 	void DrawIndexed(size_t num_indices)
 	{
 		assert(boundBuffer);
@@ -228,9 +255,9 @@ struct Renderer
 			VSInput input1{};
 			VSInput input2{};
 
-			rnd::u16 idx0 = boundIndexBuffer->data[i * 3 + 0];
-			rnd::u16 idx1 = boundIndexBuffer->data[i * 3 + 1];
-			rnd::u16 idx2 = boundIndexBuffer->data[i * 3 + 2];
+			const rnd::u16 idx0 = boundIndexBuffer->data[i * 3 + 0];
+			const rnd::u16 idx1 = boundIndexBuffer->data[i * 3 + 1];
+			const rnd::u16 idx2 = boundIndexBuffer->data[i * 3 + 2];
 
 			// for each attribute in the vertex
 			for (const VertexAttrib& a : boundBuffer->get_attribs())
@@ -239,9 +266,9 @@ struct Renderer
 				const uint8_t* ptr1 = boundBuffer->get_data() + boundBuffer->get_stride() * idx1 + a.offset;
 				const uint8_t* ptr2 = boundBuffer->get_data() + boundBuffer->get_stride() * idx2 + a.offset;
 
-				GenericValue val0 = extract_vertex_attribute(ptr0, a);
-				GenericValue val1 = extract_vertex_attribute(ptr1, a);
-				GenericValue val2 = extract_vertex_attribute(ptr2, a);
+				const GenericValue val0 = extract_vertex_attribute(ptr0, a);
+				const GenericValue val1 = extract_vertex_attribute(ptr1, a);
+				const GenericValue val2 = extract_vertex_attribute(ptr2, a);
 
 				input0.Set(a.slot, val0);
 				input1.Set(a.slot, val1);
@@ -465,9 +492,9 @@ private:
 			VSInput input1{};
 			VSInput input2{};
 
-			rnd::u16 idx0 = boundIndexBuffer->data[i * 3 + 0];
-			rnd::u16 idx1 = boundIndexBuffer->data[i * 3 + 1];
-			rnd::u16 idx2 = boundIndexBuffer->data[i * 3 + 2];
+			const rnd::u16 idx0 = boundIndexBuffer->data[i * 3 + 0];
+			const rnd::u16 idx1 = boundIndexBuffer->data[i * 3 + 1];
+			const rnd::u16 idx2 = boundIndexBuffer->data[i * 3 + 2];
 
 			for (const VertexAttrib& a : boundBuffer->get_attribs())
 			{
@@ -475,9 +502,9 @@ private:
 				const uint8_t* ptr1 = boundBuffer->get_data() + boundBuffer->get_stride() * idx1 + a.offset;
 				const uint8_t* ptr2 = boundBuffer->get_data() + boundBuffer->get_stride() * idx2 + a.offset;
 
-				GenericValue val0 = extract_vertex_attribute(ptr0, a);
-				GenericValue val1 = extract_vertex_attribute(ptr1, a);
-				GenericValue val2 = extract_vertex_attribute(ptr2, a);
+				const GenericValue val0 = extract_vertex_attribute(ptr0, a);
+				const GenericValue val1 = extract_vertex_attribute(ptr1, a);
+				const GenericValue val2 = extract_vertex_attribute(ptr2, a);
 
 				input0.Set(a.slot, val0);
 				input1.Set(a.slot, val1);
@@ -497,7 +524,7 @@ private:
 			vsout[2].Position = _viewport.transform(perspective_divide(vsout[2].Position));
 
 			// perspective correction
-			std::size_t sz = vsout->Size();
+			const std::size_t sz = vsout->Size();
 			for (int j = 0; j < sz; ++j)
 			{
 				GenericValue& gv0 = vsout[0].varyings[j];
@@ -636,10 +663,10 @@ private:
 			{
 				for (int tx = tx0; tx <= tx1; ++tx)
 				{
-					int idx = ty * NUM_TX + tx;
+					const int idx = ty * NUM_TX + tx;
 
 					//int c = binCount[idx]++;
-					int c = binCount[idx].fetch_add(1, std::memory_order_relaxed);
+					const int c = binCount[idx].fetch_add(1, std::memory_order_relaxed);
 
 					assert(c < MAX_TRI_PER_TILE);
 					binData[idx * MAX_TRI_PER_TILE + c] = ti;	// binData[idx][c] = ti;
